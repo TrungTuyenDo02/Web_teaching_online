@@ -1,0 +1,21 @@
+[project]
+name = "gia-su-online-api"
+version = "0.1.0"
+description = "API cho nền tảng gia sư trực tuyến 1-1"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Cách viết chuẩn của FastAPI: Depends(...) và Header(...) làm giá trị mặc định tham số
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]

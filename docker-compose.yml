@@ -1,0 +1,16 @@
+# Chạy API và máy chủ bảng viết bằng Docker (web triển khai riêng lên Cloudflare Pages).
+# Cần file .env ở thư mục gốc (xem .env.example).
+services:
+  api:
+    build: ./apps/api
+    env_file: .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  whiteboard-sync:
+    build: ./services/whiteboard-sync
+    env_file: .env
+    ports:
+      - "8787:8787"
+    restart: unless-stopped

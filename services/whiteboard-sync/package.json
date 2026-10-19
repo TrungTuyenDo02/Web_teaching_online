@@ -1,0 +1,25 @@
+{
+  "name": "whiteboard-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Máy chủ đồng bộ bảng viết (Excalidraw) cho buổi học 1-1 qua WebSocket",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "18.0.8",
+    "jose": "6.2.12",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "@types/ws": "8.18.2",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

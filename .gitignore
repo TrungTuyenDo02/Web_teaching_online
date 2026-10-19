@@ -1,0 +1,36 @@
+# Bí mật: không bao giờ commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Dữ liệu học sinh (ảnh bài làm, bản xuất bảng viết) không đưa vào git
+/data/
+*.local
+
+# Claude Code: cài đặt riêng từng máy
+.claude/settings.local.json
