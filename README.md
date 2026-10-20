@@ -2,17 +2,18 @@
 
 Nền tảng dạy học trực tuyến 1-1 cho một giáo viên và nhiều học sinh: phòng học video, bảng viết đồng bộ (giáo viên viết bằng bút trên tablet Android), quản lý học sinh, lịch và báo cáo buổi học. Học sinh có thể là trẻ vị thành niên nên quyền riêng tư là yêu cầu hàng đầu.
 
-**Trạng thái (2026-10-20):** Giai đoạn 1 đã code xong và có test tự động, **chưa nghiệm thu** với dịch vụ thật và tablet thật. Phần mở rộng theo [TUTOR_PLATFORM_SPEC.md](TUTOR_PLATFORM_SPEC.md) đang làm theo mốc: xong M0 nền và M1a (báo cáo tháng, ghi chú riêng, lịch hằng tuần); M1b–M5 chưa làm. Chi tiết: [docs/progress.md](docs/progress.md).
+**Trạng thái (2026-10-21):** Giai đoạn 1 đã có các chức năng chính và test tự động, **chưa nghiệm thu** với dịch vụ thật và tablet thật; lỗi token video vẫn mở. Phần mở rộng theo [TUTOR_PLATFORM_SPEC.md](TUTOR_PLATFORM_SPEC.md) đã code/test cục bộ M0 nền và M1a (báo cáo tháng, ghi chú riêng, lịch hằng tuần); migration 0009 chưa áp thật, M1b–M5 chưa làm. Chi tiết: [docs/progress.md](docs/progress.md).
 
 ## Chức năng
 
 | Nhóm | Đã có |
 |---|---|
 | Phòng học | Video LiveKit; bảng viết Excalidraw đồng bộ qua máy chủ riêng; tablet ở chế độ `board` chỉ vào bảng (không tính phút video); học sinh chỉ xem bảng; nối lại và gửi bù khi mất mạng |
-| Buổi học | Tạo/sửa/hủy, vào phòng, kết thúc (đóng phòng, lưu ảnh bảng vào Storage), tự đánh `no_show`, xem lại bảng của buổi đã học |
+| Buổi học | Tạo/sửa/hủy, vào phòng, kết thúc (đóng phòng, lưu snapshot JSON của bảng vào Storage), tự đánh `no_show`, xem lại bảng của buổi đã học |
 | Học sinh | Tạo tài khoản, sửa, ngừng dạy, xóa hẳn (dọn Auth, Storage, bảng; làm tiếp được nếu lỗi giữa chừng) |
 | Quản lý (M1a) | Báo cáo số buổi theo tháng + CSV; ghi chú riêng của giáo viên và chủ đề đã dạy (xuất Markdown/CSV); lịch hằng tuần tự sinh buổi 28 ngày, chống sinh trùng ở DB |
 | Giao diện | Tiếng Việt/tiếng Anh, trang giới thiệu cho khách, dùng được trên điện thoại và tablet (vùng chạm ≥ 44 px) |
+| Trợ giúp | Linh vật ở góc trang, bấm mở chat hướng dẫn thao tác và lối tắt riêng cho giáo viên/học sinh; chưa kết nối AI hay trả lời kiến thức bài học |
 
 Chưa có: giao, nộp, chữa bài; trợ lý giáo viên (Teacher-Ops); AI chấm bài; Tutor. Không ghi hình buổi học.
 
@@ -33,6 +34,17 @@ docs/                 Tiến độ, luồng, kiến trúc, quyết định, nghi
 ```
 
 Tài liệu nên đọc: [docs/progress.md](docs/progress.md) (đang làm gì, việc tiếp theo), [docs/flows.md](docs/flows.md) (sơ đồ luồng), [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decisions.md), [docs/platform-workflow.md](docs/platform-workflow.md) (lộ trình M0–M5). Hướng dẫn cho công cụ code AI: [AGENTS.md](AGENTS.md).
+
+| Cần biết hoặc làm gì? | Đọc ở đâu? |
+|---|---|
+| Hiện trạng và thứ tự công việc | [docs/progress.md](docs/progress.md) — nguồn bàn giao duy nhất |
+| Thử bảng trên laptop và tablet | [docs/tablet-wifi.md](docs/tablet-wifi.md) |
+| Nghiệm thu, migration thật, backup/restore | [docs/acceptance.md](docs/acceptance.md); [supabase/verify_migrations.sql](supabase/verify_migrations.sql) chỉ kiểm tra, không áp migration |
+| Lỗi token video và kết quả T8b/T15 | [docs/design-video-token.md](docs/design-video-token.md), mục 9.3 |
+| Chạy test hoặc đọc kết quả đã ghi | [docs/testing.md](docs/testing.md), [docs/testing-plan.md](docs/testing-plan.md) |
+| Lộ trình mở rộng Tutor | [docs/platform-workflow.md](docs/platform-workflow.md); `TUTOR_PLATFORM_SPEC.md` là bản nháp, `STATUS.md` là nhật ký mốc |
+
+Các bản `docs/assessment-and-plan.md`, `docs/claude-code-plan.md` và `docs/review-2026-10-20.md` giữ đánh giá lịch sử; không dùng các mục “việc tiếp theo” trong đó thay sổ bàn giao. `docs/next-step-prompt.md` chỉ phục vụ phiên thử tablet.
 
 ## Yêu cầu
 
@@ -86,7 +98,7 @@ Cách viết và chạy test: [docs/testing.md](docs/testing.md). Nghiệm thu v
 
 ## Còn mở trước khi dạy thật
 
-- **Token video:** token cấp trước khi kết thúc buổi vẫn vào lại được phòng đã xóa trên LiveKit Cloud (T3/T3B). Chờ đo thêm (T8b/T15) rồi làm nhãn danh tính. Xem [docs/design-video-token.md](docs/design-video-token.md).
+- **Token video:** token cấp trước khi kết thúc buổi vẫn vào lại được phòng đã xóa trên LiveKit Cloud (T3/T3B). T8b cho thấy thu hồi hết hiệu lực trong khoảng 6–12 phút; T15 đang chờ kết quả, chưa chốt hướng sửa. Giữ API dev dừng tới khi T15 xong. Xem [docs/design-video-token.md](docs/design-video-token.md).
 - Migration `0009_weekly_slots.sql` chưa áp lên Supabase thật.
 - Chưa chạy toàn luồng với Supabase/LiveKit thật, chưa thử bút trên tablet Android, chưa thử sao lưu/khôi phục, chưa chốt thời hạn giữ dữ liệu đã xóa trong bản sao lưu.
 - Giao diện Excalidraw còn tiếng Anh. Dockerfile và `docker-compose.yml` chưa build thử.

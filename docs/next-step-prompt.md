@@ -1,6 +1,6 @@
 # Prompt làm tiếp: nghiệm thu bảng trên tablet thật
 
-Soạn ngày 2026-10-20 sau khi đối chiếu cấu trúc, code và sổ bàn giao. Sao chép nội dung dưới đây sang phiên làm việc tiếp theo.
+Soạn ngày 2026-10-20, cập nhật trạng thái ngày 2026-10-21. Chỉ dùng cho phiên thử tablet; hiện trạng và ưu tiên chung luôn lấy từ [progress.md](progress.md).
 
 ```text
 Tiếp tục dự án gia-su-online ở bước thử bảng trên laptop và tablet Android thật cùng Wi-Fi.
@@ -10,7 +10,7 @@ Tiếp tục dự án gia-su-online ở bước thử bảng trên laptop và ta
 Hiện trạng:
 - Giai đoạn 1 đã có quản lý học sinh/buổi học, video, tablet chỉ bảng, lưu/xem lại bảng, retry kết thúc và xóa học sinh, heartbeat/reconnect, CI RLS trong cấu hình.
 - Trang /dev/whiteboard và hai lệnh dev-board-lan/dev-web-lan đã có; không xây lại môi trường thử. Đã kiểm bằng Chrome headless và test giao thức, chưa nghiệm thu tablet/bút/Wi-Fi thật. Checklist 16 mục trong docs/tablet-wifi.md còn trống.
-- Theo lần kiểm gần nhất, Supabase thật mới áp đến 0003; 0004–0007 chưa áp. Token video cũ vào lại sau khi kết thúc vẫn là lỗi mở. Hai việc này độc lập với lần thử bảng Wi-Fi không cần Supabase/API/LiveKit.
+- Theo sổ bàn giao, Supabase thật đã áp 0001–0008 (verify 14/14), còn 0009 chưa áp; phiên thử tablet không tự xác minh hay áp migration thật. Token video cũ vào lại sau khi kết thúc vẫn là lỗi mở: T8b cho thấy thu hồi hết hiệu lực trong khoảng 6–12 phút, T15 đang chờ kết quả. Giữ API dev dừng tới khi T15 xong. Thử bảng Wi-Fi không cần Supabase/API/LiveKit nên có thể làm độc lập.
 
 Mục tiêu phiên này: giúp tôi chạy và ghi kết quả thử bảng bằng thiết bị thật, rồi xử lý lỗi có bằng chứng trong phạm vi đó.
 
@@ -24,5 +24,5 @@ Mục tiêu phiên này: giúp tôi chạy và ghi kết quả thử bảng bằ
 5. Tuân thủ giới hạn: chỉ dữ liệu giả; không đọc/in/sửa file bí mật; không tự đổi firewall, network profile hay chứng chỉ; không mở 0.0.0.0/tunnel/Internet; không ghi Supabase/LiveKit thật, áp migration, commit hoặc push trong tác vụ này. Giữ mặc định local, giới hạn IP/Origin/phòng dev-*, mã ghép nối ngẫu nhiên và trang thử chỉ development. Không mở Giai đoạn 2/3 hoặc tự chọn kiến trúc sửa token video.
 6. Nếu sửa code, chạy make test, make lint, make build-web; bảo đảm công cụ không đọc file bí mật (dùng bản sao mã nguồn không chứa bí mật khi cần). Lệnh lỗi môi trường thì ghi rõ lệnh chuẩn, lệnh thay thế và kết quả thật. Cập nhật kết quả vào docs/tablet-wifi.md, tóm tắt đúng phạm vi vào docs/acceptance.md và docs/progress.md; đổi luồng thì sửa docs/flows.md. Thử xong dừng các tiến trình do phiên này tạo.
 
-Kết thúc báo ngắn: kết quả thiết bị thật, lỗi đã sửa, kiểm tra thực chạy, mục chưa thử và bước tiếp theo. Bảng Wi-Fi đạt chưa có nghĩa toàn bộ Giai đoạn 1 đạt; sau đó mới chuẩn bị áp 0004–0007 theo acceptance và nghiệm thu tích hợp khi có quyền tương ứng. Nếu tôi chưa có tablet sẵn, hoàn tất phần chuẩn bị, ghi Chưa thử và bàn giao; không tự đánh dấu nghiệm thu đạt hay chuyển sang tính năng khác.
+Kết thúc báo ngắn: kết quả thiết bị thật, lỗi đã sửa, kiểm tra thực chạy, mục chưa thử và bước tiếp theo. Bảng Wi-Fi đạt chưa có nghĩa toàn bộ Giai đoạn 1 đạt; sau đó đối chiếu progress/acceptance để chuẩn bị migration 0009 và nghiệm thu tích hợp khi có quyền tương ứng. Không chạy lại 0001–0008. Nếu tôi chưa có tablet sẵn, hoàn tất phần chuẩn bị, ghi Chưa thử và bàn giao; không tự đánh dấu nghiệm thu đạt hay chuyển sang tính năng khác.
 ```

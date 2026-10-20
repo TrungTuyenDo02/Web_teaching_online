@@ -1,5 +1,7 @@
 # Rà soát lộ trình và kế hoạch giao Claude Code
 
+> **Tài liệu lịch sử, không dùng làm backlog hiện tại.** Các lát xóa học sinh, kiểm thử trình duyệt và cấu hình CI RLS bên dưới đã được triển khai sau lần đánh giá này. Hiện trạng/thứ tự việc lấy từ [progress.md](progress.md); nghiệm thu ở [acceptance.md](acceptance.md), lộ trình mở rộng ở [platform-workflow.md](platform-workflow.md). Các số test và trạng thái migration bên dưới chỉ phản ánh thời điểm đánh giá.
+
 Ngày: 20/10/2026. Phạm vi: Giai đoạn 1, một giáo viên, lớp 1-1, học sinh chỉ xem bảng. Đối chiếu mã nguồn đang có trong workspace, không chỉ bản đã commit. Phiên này chỉ sửa tài liệu; không đọc file `.env`, không sửa ứng dụng hoặc migration.
 
 ## Cập nhật sau khi Claude Code thực hiện lát 1–3
