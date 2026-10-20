@@ -49,6 +49,14 @@ dev-board-lan: require-lan-ip ## Máy chủ bảng thử mở cho Wi-Fi: LAN_IP=
 dev-web-lan: require-lan-ip ## Web dev mở cho Wi-Fi (không nạp file môi trường): LAN_IP=<IP laptop> [WEB_PORT=5173]
 	cd apps/web && LAN_IP=$(LAN_IP) npm run dev -- --mode lan --port $(WEB_PORT) --strictPort
 
+# Thử bảng bằng tablet qua cáp USB (không cần Wi-Fi): make dev-board-local, make dev-web, rồi make tablet-usb
+tablet-usb: ## Nối tablet Android qua cáp USB (cần adb): chuyển cổng web 5173, cấp token 8789, bảng 8790 về laptop
+	@command -v adb >/dev/null || { echo "Chưa có adb: cài Android SDK Platform-Tools, xem docs/tablet-wifi.md"; exit 1; }
+	adb reverse tcp:5173 tcp:5173
+	adb reverse tcp:8789 tcp:8789
+	adb reverse tcp:8790 tcp:8790
+	@echo "Trên tablet mở Chrome: http://localhost:5173/dev/whiteboard  (gỡ: adb reverse --remove-all)"
+
 test: test-api test-board test-evals ## Chạy toàn bộ test cục bộ và eval xác định
 
 test-api:
@@ -76,4 +84,4 @@ test-e2e: ## Test trình duyệt đầy đủ, gồm nhóm @slow
 build-web: ## Build web
 	cd apps/web && npm run build
 
-.PHONY: help install install-api install-web install-board dev-api dev-web dev-board dev-board-local dev-board-lan dev-web-lan require-lan-ip test test-api test-board test-evals test-e2e test-e2e-smoke lint build-web
+.PHONY: help install install-api install-web install-board dev-api dev-web dev-board dev-board-local dev-board-lan dev-web-lan require-lan-ip tablet-usb test test-api test-board test-evals test-e2e test-e2e-smoke lint build-web

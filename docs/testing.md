@@ -25,7 +25,8 @@ cd ../../services/whiteboard-sync && npm ci   # máy chủ bảng thử cần ts
 ```
 
 - `npm run test:e2e:smoke` (hoặc `make test-e2e-smoke`): nhóm `@smoke`, chạy mỗi PR.
-- `npm run test:e2e` (hoặc `make test-e2e`): toàn bộ, gồm `@slow` (treo đường truyền thật 40 giây).
+- `npm run test:e2e` (hoặc `make test-e2e`): toàn bộ, gồm `@slow` (treo đường truyền thật 40 giây) và `@perf`.
+- `npx playwright test --grep @perf`: đo nét bút INK-01 (thời gian xử lý, độ trễ sang học sinh, dung lượng), in số đo; cách đọc ở [tablet-wifi.md](tablet-wifi.md).
 - Một tệp hoặc một test: `npx playwright test e2e/board/board.spec.ts -g "BOARD-02"`.
 
 Đo thực tế trên máy phát triển (Windows, 2026-10-20, sau khi thêm trang giới thiệu, song ngữ và ghi chú riêng): đầy đủ **55 test, 3,3 phút** (số worker mặc định); smoke **39 test, 2,0 phút** với `CI=1` (2 worker).
@@ -69,7 +70,7 @@ LiveKit không bao giờ được kết nối. Test đối chứng ROOM-01 trỏ
 ### Thêm test
 
 1. Đặt tệp vào `e2e/ui`, `e2e/board` hoặc `e2e/build`; import `test`, `expect` từ `e2e/fixtures/test`.
-2. Tên test bắt đầu bằng ID trong `testing-plan.md`; gắn `@smoke` nếu là P0 và chạy nhanh, `@slow` nếu chờ thời gian thật.
+2. Tên test bắt đầu bằng ID trong `testing-plan.md`; gắn `@smoke` nếu là P0 và chạy nhanh, `@slow` nếu chờ thời gian thật, `@perf` nếu là phép đo in số liệu.
 3. Chờ điều kiện có ý nghĩa (`expect(...)`, `expect.poll`, sự kiện), không dùng sleep cố định. Với bảng, chờ nội dung ở máy nhận.
 4. Lỗi console có chủ đích: `allowConsole(/status of 4\d\d/)` hẹp nhất có thể.
 5. Sửa lỗi: viết test đỏ trước, sửa tối thiểu, chạy lại.

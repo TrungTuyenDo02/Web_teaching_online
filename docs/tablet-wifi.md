@@ -40,6 +40,38 @@ Android Chrome có thể cảnh báo "tải xuống không an toàn" khi tải P
 
 Dòng "Tab học sinh cùng trình duyệt: đã nhận nét mới nhất" chỉ xác nhận giữa các tab **trong cùng một trình duyệt** (`BroadcastChannel`). Với hai thiết bị khác nhau, trang ghi "Máy khác (tablet/laptop kia) không báo về đây: nhìn nét trên máy đó" — hãy nhìn trực tiếp màn hình máy kia, hoặc so số "Đã nhận từ máy chủ" bên học sinh với "Đã gửi lên máy chủ" bên giáo viên.
 
+## Cách khác: cáp USB (không cần Wi-Fi)
+
+Dùng khi không có Wi-Fi tin cậy, hoặc để thử bút mà không lẫn độ giật của Wi-Fi. Không dùng Bluetooth: trang web không gửi dữ liệu qua Bluetooth được, còn chia sẻ mạng qua Bluetooth chậm và giật hơn Wi-Fi nên làm sai số đo.
+
+Chuẩn bị một lần:
+- Tablet: Cài đặt → Thông tin máy → chạm 7 lần vào "Số hiệu bản tạo" để bật Tùy chọn nhà phát triển → bật **Gỡ lỗi USB**.
+- Laptop: cài **Android SDK Platform-Tools** (công cụ chính thức của Google, có `adb`), ví dụ `winget install Google.PlatformTools`, rồi mở terminal mới. Cắm cáp, trên tablet chọn "Cho phép gỡ lỗi USB".
+
+Mỗi lần thử:
+1. Cửa sổ 1: `make dev-board-local`. Cửa sổ 2: `make dev-web` (phải đúng cổng 5173; cổng bận thì tắt Vite kia trước).
+2. Cửa sổ 3: `make tablet-usb` (chuyển cổng 5173, 8789, 8790 của tablet về laptop qua cáp).
+3. Tablet và laptop cùng mở `http://localhost:5173/dev/whiteboard`. Không cần mã ghép nối, không cần sửa firewall: mọi cổng vẫn chỉ nghe trong laptop.
+4. Thử xong: `adb reverse --remove-all`, Ctrl+C hai cửa sổ.
+
+Mục 8, 9 (tắt Wi-Fi) khi dùng cáp: rút cáp rồi cắm lại (cắm lại phải chạy lại `make tablet-usb`), hoặc dùng mục 14. Kết quả mất mạng thật vẫn phải thử qua Wi-Fi.
+
+Đã kiểm 2026-10-21 trên laptop (chưa có tablet, chưa có `adb`): trang `http://localhost:5173/dev/whiteboard` với `make dev-board-local` kết nối được hai vai trò ("2 thiết bị", học sinh "Chỉ xem"); máy chủ cấp token trả `ws://127.0.0.1:8790`, đúng cổng `make tablet-usb` chuyển. Đường qua cáp thật **chưa thử**.
+
+## Đo độ trễ và dung lượng nét bút
+
+**Trên laptop, tự động** (bút giả lập, máy chủ bảng thật, không mạng): `cd apps/web && npx playwright test --grep @perf`. In dòng `INK-01 {...}`:
+- `teacherEventMs`: thời gian trang giáo viên xử lý một sự kiện bút. Lớn hơn khoảng cách giữa hai sự kiện bút (8 ms ở 120 Hz, 16 ms ở 60 Hz) thì trình duyệt gộp sự kiện và Excalidraw chỉ lấy một điểm mỗi lần, nét viết nhanh bị gãy góc.
+- `latencyToStudentMs`: từ lúc giáo viên xử lý xong đến lúc nét có trên bảng học sinh (chưa gồm mạng thật và vẽ ra màn hình).
+- `sentKB`, `finalElementKB`, `resendFactor`: đang vẽ thì cứ mỗi 40 ms lại gửi cả nét từ đầu, nên tổng gửi lớn hơn nhiều lần kích thước nét. Hệ số phụ thuộc nhịp sự kiện trong test (test chạy chậm hơn thời gian thật), chỉ dùng để so trước/sau khi sửa.
+
+Kết quả 2026-10-21 (laptop này, Chromium headless, 3 lần): nét 242 điểm; `teacherEventMs` p50 19–20, p95 40–42 ms; `latencyToStudentMs` p50 71–72, p95 103–109 ms; gửi 1,3 MB cho nét cuối cùng 11 KB.
+
+**Trên tablet thật** (bổ sung cho bảng kết quả bên dưới):
+- Mực dưới đầu bút: quay chậm bằng điện thoại (240 khung hình/giây) khi kẻ một đường nhanh, đếm khung hình từ đầu bút tới đầu nét mực (1 khung ≈ 4,2 ms). Nghiên cứu (Annett và cs., Graphics Interface 2014) cho thấy người viết nhận ra độ trễ từ khoảng 50 ms.
+- Tablet sang laptop: đặt hai màn hình cạnh nhau, quay chậm, đếm khung hình từ lúc nét hiện trên tablet tới lúc hiện trên laptop.
+- Dung lượng: khi nối bằng cáp, mở `chrome://inspect` trên laptop → tablet → Inspect → tab Network → WS, xem kích thước các khung `update` khi viết một nét dài.
+
 ## Lỗi ở đâu
 
 | Hiện tượng trên tablet | Tầng lỗi | Kiểm tra |
