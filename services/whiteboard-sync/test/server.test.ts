@@ -16,6 +16,14 @@ async function token(sub: string, sid: string, role = "teacher", mode = "main", 
     .sign(new TextEncoder().encode(secret));
 }
 
+async function closeToken(sid: string, secret = SECRET, extra: Record<string, unknown> = { act: "close" }) {
+  return new SignJWT({ sid, ...extra })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
+    .sign(new TextEncoder().encode(secret));
+}
+
 /** Mở kết nối và gom các tin nhận được; tiện cho việc chờ tin cụ thể. */
 function connect(port: number, origin = ORIGIN) {
   const ws = new WebSocket(`ws://127.0.0.1:${port}`, { origin });
@@ -93,6 +101,31 @@ describe("whiteboard-sync server", () => {
     late.ws.close();
   });
 
+  it("học sinh chỉ xem: nét vẽ của học sinh không được nhận và không gửi đi", async () => {
+    const teacher = connect(port);
+    const student = connect(port);
+    await Promise.all([teacher.opened, student.opened]);
+    teacher.ws.send(JSON.stringify({ type: "auth", token: await token("teacher-1", "s-view") }));
+    student.ws.send(JSON.stringify({ type: "auth", token: await token("student-1", "s-view", "student") }));
+    await teacher.next((m) => m.type === "init");
+    await student.next((m) => m.type === "init");
+
+    student.ws.send(JSON.stringify({ type: "update", elements: [{ id: "hs", version: 1, versionNonce: 1 }] }));
+    teacher.ws.send(JSON.stringify({ type: "update", elements: [{ id: "gv", version: 1, versionNonce: 1 }] }));
+    // nét của giáo viên vẫn đến học sinh; nét của học sinh không đến giáo viên
+    const got = await student.next((m) => m.type === "update");
+    assert.equal(got.elements[0].id, "gv");
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(!teacher.inbox.some((m) => m.type === "update"));
+
+    const late = connect(port);
+    await late.opened;
+    late.ws.send(JSON.stringify({ type: "auth", token: await token("teacher-1", "s-view", "teacher", "board") }));
+    const init = await late.next((m) => m.type === "init");
+    assert.deepEqual(init.elements.map((e: any) => e.id), ["gv"]);
+    for (const c of [teacher, student, late]) c.ws.close();
+  });
+
   it("không gửi nét vẽ sang buổi học khác", async () => {
     const a = connect(port);
     const other = connect(port);
@@ -152,5 +185,57 @@ describe("whiteboard-sync server", () => {
     const one = await a.next((m) => m.type === "peers" && m.count === 1);
     assert.equal(one.count, 1);
     a.ws.close();
+  });
+
+  it("API đóng phòng: mọi thiết bị nhận ended, bị ngắt, không vào lại được bằng token cũ", async () => {
+    const teacher = connect(port);
+    const tablet = connect(port);
+    const student = connect(port);
+    await Promise.all([teacher.opened, tablet.opened, student.opened]);
+    const studentToken = await token("student-1", "s-end", "student");
+    teacher.ws.send(JSON.stringify({ type: "auth", token: await token("teacher-1", "s-end") }));
+    tablet.ws.send(JSON.stringify({ type: "auth", token: await token("teacher-1", "s-end", "teacher", "board") }));
+    student.ws.send(JSON.stringify({ type: "auth", token: studentToken }));
+    for (const c of [teacher, tablet, student]) await c.next((m) => m.type === "init");
+
+    const resp = await fetch(`http://127.0.0.1:${port}/rooms/s-end/close`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${await closeToken("s-end")}` },
+    });
+    assert.equal(resp.status, 200);
+    for (const c of [teacher, tablet, student]) {
+      await c.next((m) => m.type === "ended");
+      assert.equal(await c.closed, 4410);
+    }
+
+    const again = connect(port);
+    await again.opened;
+    again.ws.send(JSON.stringify({ type: "auth", token: studentToken }));
+    assert.equal(await again.closed, 4410);
+  });
+
+  it("đóng phòng cần token đóng phòng đúng buổi", async () => {
+    const url = `http://127.0.0.1:${port}/rooms/s-guard/close`;
+    const post = (auth?: string) =>
+      fetch(url, { method: "POST", headers: auth ? { authorization: `Bearer ${auth}` } : {} });
+    assert.equal((await post()).status, 401);
+    // token vào phòng của giáo viên không dùng để đóng phòng được
+    assert.equal((await post(await token("teacher-1", "s-guard"))).status, 401);
+    assert.equal((await post(await closeToken("s-guard", "wrong-secret-wrong-secret-wrong-secret!"))).status, 401);
+    assert.equal((await post(await closeToken("s-other"))).status, 401);
+
+    // phòng vẫn mở sau các lần thử sai
+    const c = connect(port);
+    await c.opened;
+    c.ws.send(JSON.stringify({ type: "auth", token: await token("teacher-1", "s-guard") }));
+    await c.next((m) => m.type === "init");
+    c.ws.close();
+  });
+
+  it("token đóng phòng không dùng để vào phòng được", async () => {
+    const c = connect(port);
+    await c.opened;
+    c.ws.send(JSON.stringify({ type: "auth", token: await closeToken("s-x", SECRET, { act: "close", sub: "x", role: "teacher", mode: "main" }) }));
+    assert.equal(await c.closed, 4401);
   });
 });

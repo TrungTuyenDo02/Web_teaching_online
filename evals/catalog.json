@@ -1,0 +1,12 @@
+{
+  "E0": {"name": "Thời gian xác định", "mode": "offline", "cases": "suites/deterministic/cases.jsonl"},
+  "E1": {"name": "Gọi tool tiếng Việt", "mode": "not_implemented"},
+  "E2": {"name": "Quyền API và tool", "mode": "existing_api_tests"},
+  "E3": {"name": "OCR trung thực", "mode": "requires_provider_and_labeled_data"},
+  "E4": {"name": "Chấm bài so với giáo viên", "mode": "requires_labeled_data"},
+  "E5": {"name": "Đáp án tham chiếu", "mode": "not_implemented"},
+  "E6": {"name": "Tutor rò rỉ", "mode": "not_implemented"},
+  "E7": {"name": "Truy xuất có khóa", "mode": "not_implemented"},
+  "E8": {"name": "Chỉ dẫn trong bài nộp", "mode": "not_implemented"},
+  "E9": {"name": "E2E toàn luồng mới", "mode": "not_implemented"}
+}

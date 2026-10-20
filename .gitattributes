@@ -1,0 +1,2 @@
+# Script shell chạy bằng bash (WSL, CI): giữ LF kể cả khi core.autocrlf=true
+*.sh text eol=lf

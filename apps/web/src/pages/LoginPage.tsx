@@ -1,17 +1,24 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { brand } from "../brand";
+import { t } from "../lib/i18n";
+import { Button } from "../ui/Button";
+import { Decor } from "../ui/Decor";
+import { Field } from "../ui/Field";
+import { Alert } from "../ui/Feedback";
+import { LangSwitch } from "../ui/LangSwitch";
+import { Window } from "../ui/Window";
 
 export default function LoginPage() {
-  const { session, signIn } = useAuth();
+  const { user, signIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (session) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/" replace />;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -24,21 +31,35 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="center card">
-      <h1>{brand.name}</h1>
-      <p className="muted">{brand.tagline}</p>
-      <form onSubmit={onSubmit} className="stack">
-        <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />
-        </label>
-        <label>
-          Mật khẩu
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
-        </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button type="submit" disabled={busy}>{busy ? "Đang đăng nhập…" : "Đăng nhập"}</button>
-      </form>
+    <main className="centered">
+      <div className="centered__top">
+        <Link to="/" className="btn btn--ghost btn--sm">
+          ← {t("Giới thiệu")}
+        </Link>
+        <LangSwitch />
+      </div>
+      <Window title={t("Đăng nhập")} file="login.exe" variant="peach">
+        <div className="stack">
+          <p className="hero__title">
+            <Decor type="sparkle" size={20} /> {brand.name}
+          </p>
+          <p className="muted">{t(brand.tagline)}</p>
+        </div>
+        <form className="form" onSubmit={onSubmit}>
+          {error && <Alert tone="error">{error}</Alert>}
+          <Field label="Email">
+            {(c) => <input {...c} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />}
+          </Field>
+          <Field label={t("Mật khẩu")} hint={t("Quên mật khẩu? Nhờ thầy cô đặt lại giúp.")}>
+            {(c) => (
+              <input {...c} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+            )}
+          </Field>
+          <Button type="submit" variant="primary" size="lg" block busy={busy} busyLabel={t("Đang đăng nhập…")}>
+            {t("Đăng nhập")}
+          </Button>
+        </form>
+      </Window>
     </main>
   );
 }

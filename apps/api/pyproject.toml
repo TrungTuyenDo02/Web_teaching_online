@@ -14,8 +14,11 @@ line-length = 100
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM"]
+select = ["E", "F", "I", "B", "UP", "SIM", "DTZ"]
 
 [tool.ruff.lint.flake8-bugbear]
 # Cách viết chuẩn của FastAPI: Depends(...) và Header(...) làm giá trị mặc định tham số
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests", "scripts"]

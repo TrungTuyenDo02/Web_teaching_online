@@ -1,0 +1,11 @@
+# Nhật ký triển khai đặc tả Tutor
+
+Sổ bàn giao và việc đang làm duy nhất: [docs/progress.md](docs/progress.md).
+Quy trình đối chiếu với đặc tả: [docs/platform-workflow.md](docs/platform-workflow.md).
+File này chỉ ghi các mốc của đặc tả theo kiểu append-only, không thay sổ tiến độ hiện tại.
+
+- 2026-10-20: Đọc TUTOR_PLATFORM_SPEC.md v0.1 và đối chiếu nền tảng hiện có. Đã tạo module thời gian, bộ ca/runner E0 offline và quy tắc kiểm trực tiếp đồng hồ, nối vào lệnh/CI. Kết quả thực chạy và giới hạn ghi trong progress khi kết thúc phiên; chưa đánh dấu M0–M5 hoặc các cổng AI đã qua. Hướng tích hợp/đổi kiến trúc đang được chủ dự án lựa chọn. Chưa gọi nhà cung cấp AI hay sửa dữ liệu thật.
+- 2026-10-20: Kiểm phần nền trên bản sao không chứa bí mật: API 186 đạt, E0 thời gian 10/10, clock guard/Ruff/format/typecheck/build web đạt, board 65/65 bằng Node 24 transform-types. Lệnh make không sẵn/chạy được trong môi trường công cụ; npm test board lỗi tsx/ENOMEM, dùng lệnh thành phần. Chưa kiểm CI GitHub, model, OCR, chấm, Tutor hoặc dịch vụ thật. M1–M5 chưa triển khai; chưa chốt đổi stack/nghiệp vụ.
+- 2026-10-20: Chủ dự án chọn giữ nền tảng hiện tại, tích hợp spec theo từng mốc (quyết định 22). Hoàn tất lát M1a.1 báo cáo tháng VN/API/UI/CSV; không đổi điều kiện completed, Auth hoặc cách xóa. Kiểm cục bộ: API 197, board 66/66, E0 10/10, Chromium smoke 32/32; lint/typecheck/build đạt bằng lệnh thành phần do make lỗi khởi chạy. M1 còn ghi chú riêng/chủ đề/lịch lặp/Teacher-Ops; M2–M5 chưa làm. Chi tiết giới hạn và bước tiếp theo tại docs/progress.md. Chưa gọi dịch vụ thật/deploy/commit.
+- 2026-10-20: M1a.2 ghi chú riêng/chủ đề đã dạy (Codex code, Claude rà soát): API/RLS/RPC CAS/xuất Markdown-CSV/UI; API 218 test, RLS + rollback 0008 đạt trên PostgreSQL 18 cục bộ, test hai kết nối chưa chạy lại được trên Windows. Chủ dự án đã áp 0004–0008 lên Supabase (verify 14/14). Tiếp theo: M1a.3 lịch lặp hằng tuần. Chưa gọi AI/deploy/commit.
+- 2026-10-20: M1a.3 lịch hằng tuần (migration 0009, API sinh 28 ngày theo giờ VN, chống trùng bằng unique (lịch, ngày), ngừng lịch hủy buổi tương lai, UI ở trang Học sinh, song ngữ). Sửa CORS thiếu PUT làm hỏng lưu ghi chú riêng M1a.2. Kiểm cục bộ: API 240, bảng 74/74, E0 10/10, e2e 57/57, RLS/verify 16/16/rollback trên PostgreSQL 18. Chưa áp 0009 lên Supabase; M1b Teacher-Ops chưa làm. Chưa gọi AI/deploy/commit.

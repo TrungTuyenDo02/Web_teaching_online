@@ -1,119 +1,93 @@
 import { CaptureUpdateAction, reconcileElements } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BoardConnection, isSyncable, type BoardActivity, type BoardStatus } from "../lib/boardConnection";
+import { t } from "../lib/i18n";
+
+export type { BoardActivity, BoardStatus } from "../lib/boardConnection";
 
 type RemoteElements = Parameters<typeof reconcileElements>[1];
 
-export type BoardStatus = "connecting" | "online" | "offline";
-
 const FLUSH_DELAY_MS = 40;
-const MAX_RETRY_DELAY_MS = 10_000;
-const CLOSE_AUTH_FAILED = 4401;
 
 interface Options {
   url: string;
   token: string;
+  onActivity?: (activity: BoardActivity) => void;
 }
 
 /**
- * Đồng bộ bảng Excalidraw qua máy chủ whiteboard-sync.
- * - Gửi các phần tử có version mới hơn bản đã gửi/nhận (gộp theo nhịp 40 ms).
- * - Nhận phần tử từ máy khác và gộp bằng reconcileElements (không đưa vào lịch sử hoàn tác).
- * - Rớt mạng thì tự nối lại; sau khi nối lại gửi nốt phần chưa gửi.
+ * Đồng bộ bảng Excalidraw qua máy chủ whiteboard-sync (giao thức ở `lib/boardConnection.ts`).
+ * - Gửi phần tử đổi theo nhịp 40 ms; nhận phần tử từ máy khác và gộp bằng reconcileElements
+ *   (không đưa vào lịch sử hoàn tác).
+ * - Ảnh chưa được đồng bộ (cần cả `files`): gỡ khỏi bảng và báo, để không chỉ hiện ở một máy.
  */
-export function useBoardSync({ url, token }: Options) {
+export function useBoardSync({ url, token, onActivity }: Options) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [status, setStatus] = useState<BoardStatus>("connecting");
   const [peers, setPeers] = useState(1);
-  const socketRef = useRef<WebSocket | null>(null);
-  const sentVersions = useRef(new Map<string, number>());
+  const connRef = useRef<BoardConnection | null>(null);
   const flushTimer = useRef<number | undefined>(undefined);
-
-  const flushNow = useCallback(() => {
-    const socket = socketRef.current;
-    if (!api || !socket || socket.readyState !== WebSocket.OPEN) return;
-    const changed = api
-      .getSceneElementsIncludingDeleted()
-      .filter((el) => (sentVersions.current.get(el.id) ?? -1) < el.version);
-    if (changed.length === 0) return;
-    socket.send(JSON.stringify({ type: "update", elements: changed }));
-    for (const el of changed) sentVersions.current.set(el.id, el.version);
-  }, [api]);
-
-  const applyRemote = useCallback(
-    (remote: unknown[]) => {
-      if (!api) return;
-      const merged = reconcileElements(
-        api.getSceneElementsIncludingDeleted(),
-        remote as RemoteElements,
-        api.getAppState(),
-      );
-      for (const el of remote as { id: string; version: number }[]) {
-        sentVersions.current.set(el.id, el.version); // đã có trên máy chủ, không gửi lại
-      }
-      api.updateScene({ elements: merged, captureUpdate: CaptureUpdateAction.NEVER });
-    },
-    [api],
-  );
-
-  /** Gắn vào prop onChange của <Excalidraw />. */
-  const onChange = useCallback(() => {
-    if (flushTimer.current !== undefined) return;
-    flushTimer.current = window.setTimeout(() => {
-      flushTimer.current = undefined;
-      flushNow();
-    }, FLUSH_DELAY_MS);
-  }, [flushNow]);
+  // Ref để đổi callback không làm nối lại kết nối
+  const activityRef = useRef(onActivity);
+  activityRef.current = onActivity;
 
   useEffect(() => {
     if (!api) return;
-    let disposed = false;
-    let attempt = 0;
-    let retryTimer: number | undefined;
-
-    const connect = () => {
-      setStatus("connecting");
-      const socket = new WebSocket(url);
-      socketRef.current = socket;
-
-      socket.onopen = () => {
-        attempt = 0;
-        socket.send(JSON.stringify({ type: "auth", token }));
-      };
-      socket.onmessage = (event) => {
-        const msg = JSON.parse(String(event.data)) as {
-          type: string;
-          elements?: unknown[];
-          peers?: number;
-          count?: number;
-        };
-        if (msg.type === "init") {
-          setStatus("online");
-          setPeers(msg.peers ?? 1);
-          applyRemote(msg.elements ?? []);
-          flushNow();
-        } else if (msg.type === "update") {
-          applyRemote(msg.elements ?? []);
-        } else if (msg.type === "peers") {
-          setPeers(msg.count ?? 1);
-        }
-      };
-      socket.onclose = (event) => {
-        if (disposed) return;
-        setStatus("offline");
-        if (event.code === CLOSE_AUTH_FAILED) return; // token sai/hết hạn: vào lại phòng để lấy token mới
-        retryTimer = window.setTimeout(connect, Math.min(1000 * 2 ** attempt++, MAX_RETRY_DELAY_MS));
-      };
-    };
-
-    connect();
+    if (!url) {
+      setStatus("preview"); // xem trước: vẽ được trên máy này, không gửi đi đâu
+      return;
+    }
+    const conn = new BoardConnection(
+      url,
+      token,
+      {
+        elements: () => api.getSceneElementsIncludingDeleted(),
+        applyRemote: (remote) => {
+          const merged = reconcileElements(
+            api.getSceneElementsIncludingDeleted(),
+            remote as unknown as RemoteElements,
+            api.getAppState(),
+          );
+          api.updateScene({ elements: merged, captureUpdate: CaptureUpdateAction.NEVER });
+        },
+      },
+      { onStatus: setStatus, onPeers: setPeers, onActivity: (a) => activityRef.current?.(a) },
+    );
+    connRef.current = conn;
+    conn.start();
+    // Tab ẩn/thiết bị ngủ thì timer bị hoãn: khi quay lại, hỏi lại máy chủ thay vì tin pong cũ
+    const recheck = () => document.visibilityState === "visible" && conn.verify();
+    document.addEventListener("visibilitychange", recheck);
+    window.addEventListener("online", recheck);
+    window.addEventListener("pageshow", recheck);
+    window.addEventListener("focus", recheck);
     return () => {
-      disposed = true;
-      window.clearTimeout(retryTimer);
-      socketRef.current?.close();
-      socketRef.current = null;
+      document.removeEventListener("visibilitychange", recheck);
+      window.removeEventListener("online", recheck);
+      window.removeEventListener("pageshow", recheck);
+      window.removeEventListener("focus", recheck);
+      conn.stop();
+      connRef.current = null;
     };
-  }, [api, url, token, applyRemote, flushNow]);
+  }, [api, url, token]);
+
+  /** Gắn vào prop onChange của <Excalidraw />. */
+  const onChange = useCallback(() => {
+    if (!api) return;
+    const elements = api.getSceneElementsIncludingDeleted();
+    if (elements.some((el) => !isSyncable(el))) {
+      // Chặn mọi đường chèn ảnh (nút, dán, kéo thả): ảnh chưa gửi được sang máy khác
+      api.updateScene({ elements: elements.filter(isSyncable), captureUpdate: CaptureUpdateAction.NEVER });
+      api.setToast({ message: t("Bảng viết chưa hỗ trợ chèn ảnh. Ảnh đã được gỡ khỏi bảng."), duration: 5000 });
+      return;
+    }
+    if (flushTimer.current !== undefined) return;
+    flushTimer.current = window.setTimeout(() => {
+      flushTimer.current = undefined;
+      connRef.current?.flush();
+    }, FLUSH_DELAY_MS);
+  }, [api]);
 
   return { api, setApi, onChange, status, peers };
 }

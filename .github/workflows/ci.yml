@@ -21,7 +21,11 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
+      - run: ruff check --config pyproject.toml ../../evals
+      - run: ruff format --check --config pyproject.toml ../../evals
+      - run: python scripts/check_time_usage.py
       - run: pytest
+      - run: python ../../evals/run.py --suite E0
 
   web:
     runs-on: ubuntu-latest
@@ -39,6 +43,37 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  # Test trình duyệt (docs/testing.md): Chromium, Vite + máy chủ bảng thử ở cổng ngẫu nhiên, Supabase/API giả,
+  # không secrets, không gọi dịch vụ thật. PR chạy nhóm @smoke; push lên main chạy toàn bộ (gồm @slow).
+  web-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            services/whiteboard-sync/package-lock.json
+      - run: npm ci
+        working-directory: services/whiteboard-sync
+      - run: npm ci
+        working-directory: apps/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run ${{ github.event_name == 'pull_request' && 'test:e2e:smoke' || 'test:e2e' }}
+        working-directory: apps/web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
+
   whiteboard-sync:
     runs-on: ubuntu-latest
     defaults:
@@ -51,6 +86,27 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: services/whiteboard-sync/package-lock.json
+      # Các test helper web dùng bộ ngôn ngữ có hook React; cần phụ thuộc web khi chạy riêng job này.
+      - run: npm ci --prefix ../../apps/web
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+  # Migration và chính sách RLS trên PostgreSQL thật (giả lập phần auth/storage của Supabase)
+  rls:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash supabase/tests/run.sh

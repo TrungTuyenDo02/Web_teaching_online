@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    # Chỉ cần cho dự án Supabase cũ ký HS256; dự án mới ký ES256, API tự lấy khóa công khai (JWKS)
     supabase_jwt_secret: str = ""
     supabase_jwt_audience: str = "authenticated"
 
@@ -26,10 +27,15 @@ class Settings(BaseSettings):
     whiteboard_jwt_secret: str = ""
     whiteboard_token_ttl_seconds: int = 7200
     whiteboard_public_url: str = "ws://localhost:8787"
+    # API gọi máy chủ bảng viết để đóng phòng (địa chỉ nội bộ, không phải của trình duyệt)
+    whiteboard_internal_url: str = "http://localhost:8787"
 
     # Cho phép vào phòng sớm/muộn so với lịch (phút)
     join_early_minutes: int = 15
     join_late_minutes: int = 60
+
+    # Chu kỳ chuyển buổi học quá giờ sang no_show (giây); 0 để tắt
+    no_show_interval_seconds: int = 300
 
     recording_enabled: bool = False
 
@@ -46,7 +52,6 @@ class Settings(BaseSettings):
         required = {
             "SUPABASE_URL": self.supabase_url,
             "SUPABASE_SERVICE_ROLE_KEY": self.supabase_service_role_key,
-            "SUPABASE_JWT_SECRET": self.supabase_jwt_secret,
             "LIVEKIT_URL": self.livekit_url,
             "LIVEKIT_API_KEY": self.livekit_api_key,
             "LIVEKIT_API_SECRET": self.livekit_api_secret,

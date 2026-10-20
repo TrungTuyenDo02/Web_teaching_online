@@ -4,6 +4,17 @@ do $$ begin
   create role authenticated nologin;
 exception when duplicate_object then null;
 end $$;
+do $$ begin
+  create role anon nologin;
+exception when duplicate_object then null;
+end $$;
+-- Như Supabase: bảng mới trong public tự cấp mọi quyền cho anon và authenticated
+do $$ begin
+  create role service_role nologin bypassrls;
+exception when duplicate_object then null;
+end $$;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated;
 
 create schema auth;
 create table auth.users (id uuid primary key, raw_user_meta_data jsonb not null default '{}');

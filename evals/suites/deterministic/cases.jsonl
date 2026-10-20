@@ -1,0 +1,10 @@
+{"id":"time-001","operation":"month_bounds","input":{"year":2026,"month":10},"expected":["2026-09-30T17:00:00+00:00","2026-10-31T17:00:00+00:00"]}
+{"id":"time-002","operation":"month_bounds","input":{"year":2026,"month":12},"expected":["2026-11-30T17:00:00+00:00","2026-12-31T17:00:00+00:00"]}
+{"id":"time-003","operation":"month_bounds","input":{"year":2024,"month":2},"expected":["2024-01-31T17:00:00+00:00","2024-02-29T17:00:00+00:00"]}
+{"id":"date-001","operation":"resolve_date","input":{"expression":"Thứ Ba tuần sau","reference":"2026-10-20T09:00:00+07:00"},"expected":"2026-10-27"}
+{"id":"date-002","operation":"resolve_date","input":{"expression":"hôm nay","reference":"2026-10-19T18:00:00+00:00"},"expected":"2026-10-20"}
+{"id":"date-003","operation":"resolve_date","input":{"expression":"ngày mai","reference":"2026-12-31T09:00:00+07:00"},"expected":"2027-01-01"}
+{"id":"date-004","operation":"resolve_date","input":{"expression":"chủ nhật tuần sau","reference":"2026-10-20T09:00:00+07:00"},"expected":"2026-11-01"}
+{"id":"date-005","operation":"resolve_date","input":{"expression":"thứ Ba","reference":"2026-10-20T09:00:00+07:00"},"expected_error":"ValueError"}
+{"id":"date-006","operation":"resolve_date","input":{"expression":"hôm nay","reference":"2026-10-20T09:00:00"},"expected_error":"ValueError"}
+{"id":"date-007","operation":"resolve_date","input":{"expression":"2026-02-30","reference":"2026-10-20T09:00:00+07:00"},"expected_error":"ValueError"}

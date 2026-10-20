@@ -1,81 +1,99 @@
 # Gia sư Online 1-1
 
-Nền tảng dạy học trực tuyến 1-1 mang thương hiệu riêng: phòng học video, bảng viết đồng bộ (tablet dùng bút), quản lý học sinh, nộp và chữa bài. AI gợi ý chấm là Giai đoạn 3.
+Nền tảng dạy học trực tuyến 1-1 cho một giáo viên và nhiều học sinh: phòng học video, bảng viết đồng bộ (giáo viên viết bằng bút trên tablet Android), quản lý học sinh, lịch và báo cáo buổi học. Học sinh có thể là trẻ vị thành niên nên quyền riêng tư là yêu cầu hàng đầu.
 
-Đây là **bộ khung Giai đoạn 1**: cấu trúc, schema, các luồng chính đã có test. Chưa phải sản phẩm hoàn chỉnh (xem mục "Đã có và chưa có").
+**Trạng thái (2026-10-20):** Giai đoạn 1 đã code xong và có test tự động, **chưa nghiệm thu** với dịch vụ thật và tablet thật. Phần mở rộng theo [TUTOR_PLATFORM_SPEC.md](TUTOR_PLATFORM_SPEC.md) đang làm theo mốc: xong M0 nền và M1a (báo cáo tháng, ghi chú riêng, lịch hằng tuần); M1b–M5 chưa làm. Chi tiết: [docs/progress.md](docs/progress.md).
+
+## Chức năng
+
+| Nhóm | Đã có |
+|---|---|
+| Phòng học | Video LiveKit; bảng viết Excalidraw đồng bộ qua máy chủ riêng; tablet ở chế độ `board` chỉ vào bảng (không tính phút video); học sinh chỉ xem bảng; nối lại và gửi bù khi mất mạng |
+| Buổi học | Tạo/sửa/hủy, vào phòng, kết thúc (đóng phòng, lưu ảnh bảng vào Storage), tự đánh `no_show`, xem lại bảng của buổi đã học |
+| Học sinh | Tạo tài khoản, sửa, ngừng dạy, xóa hẳn (dọn Auth, Storage, bảng; làm tiếp được nếu lỗi giữa chừng) |
+| Quản lý (M1a) | Báo cáo số buổi theo tháng + CSV; ghi chú riêng của giáo viên và chủ đề đã dạy (xuất Markdown/CSV); lịch hằng tuần tự sinh buổi 28 ngày, chống sinh trùng ở DB |
+| Giao diện | Tiếng Việt/tiếng Anh, trang giới thiệu cho khách, dùng được trên điện thoại và tablet (vùng chạm ≥ 44 px) |
+
+Chưa có: giao, nộp, chữa bài; trợ lý giáo viên (Teacher-Ops); AI chấm bài; Tutor. Không ghi hình buổi học.
 
 ## Cấu trúc
 
 ```
 apps/
-  api/                FastAPI: xác thực, cấp token phòng học và bảng viết, điểm danh
-  web/                React + TypeScript + Vite: đăng nhập, danh sách buổi học, phòng học
+  api/                FastAPI: xác thực, quyền, buổi học, học sinh, báo cáo, lịch, cấp token video/bảng
+  web/                React 19 + TypeScript + Vite: trang giáo viên, học sinh, phòng học
 services/
-  whiteboard-sync/    Node + WebSocket: đồng bộ nét vẽ Excalidraw giữa các thiết bị
+  whiteboard-sync/    Node 22 + ws: đồng bộ nét vẽ giữa các thiết bị, lưu bảng
 supabase/
-  migrations/         Schema PostgreSQL, RLS, bucket lưu ảnh
-  tests/              Kiểm thử migration và RLS trên PostgreSQL cục bộ
-docs/                 Kiến trúc, quyết định thiết kế, sơ đồ luồng (flows.md)
+  migrations/         Schema PostgreSQL, RLS, bucket (0001 → 0009)
+  rollback/           Gỡ thủ công 0008, 0009 (chỉ khi bảng trống)
+  tests/              Kiểm thử migration, RLS, giao dịch hai kết nối
+evals/                Eval xác định (E0: thời gian nghiệp vụ)
+docs/                 Tiến độ, luồng, kiến trúc, quyết định, nghiệm thu, kiểm thử
 ```
 
-Hai tài liệu nên đọc trước: [docs/flows.md](docs/flows.md) (sơ đồ luồng) và [docs/architecture.md](docs/architecture.md).
+Tài liệu nên đọc: [docs/progress.md](docs/progress.md) (đang làm gì, việc tiếp theo), [docs/flows.md](docs/flows.md) (sơ đồ luồng), [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decisions.md), [docs/platform-workflow.md](docs/platform-workflow.md) (lộ trình M0–M5). Hướng dẫn cho công cụ code AI: [AGENTS.md](AGENTS.md).
 
 ## Yêu cầu
 
-- Python 3.13, Node.js 22
-- Tài khoản Supabase (miễn phí đủ để thử) và LiveKit Cloud (gói Build miễn phí) hoặc LiveKit tự dựng
-- PostgreSQL 15+ cục bộ nếu muốn chạy `supabase/tests/run.sh`
+- Python 3.13, Node.js 22, `make`
+- Dự án Supabase và LiveKit (Cloud hoặc tự dựng)
+- PostgreSQL 15+ cục bộ nếu chạy `supabase/tests/run.sh`
 
 ## Bắt đầu nhanh
 
 ```bash
-cp .env.example .env                       # điền khóa Supabase, LiveKit, WHITEBOARD_JWT_SECRET
+cp .env.example .env                        # điền khóa Supabase, LiveKit, WHITEBOARD_JWT_SECRET (openssl rand -hex 32)
 cp apps/web/.env.example apps/web/.env.local
-
-make install                               # venv cho API, npm ci cho web và whiteboard-sync
+make install                                # venv cho API, npm ci cho web và máy chủ bảng
 ```
 
-1. Trong Supabase, chạy lần lượt `supabase/migrations/0001_init.sql` rồi (khi cần) `0002_ai_grading.sql` ở SQL Editor.
-2. Tạo hai tài khoản trong Supabase Auth (giáo viên, học sinh). Làm theo hướng dẫn trong `supabase/seed.sql` để nâng quyền giáo viên và tạo học sinh, buổi học mẫu.
-3. Chạy ba tiến trình, mỗi cái một cửa sổ terminal:
+1. Trong Supabase SQL Editor, áp lần lượt các file `supabase/migrations/` chưa áp (không chạy lại file đã áp), rồi chạy `supabase/verify_migrations.sql` (chỉ đọc). Hướng dẫn: [docs/acceptance.md](docs/acceptance.md) mục 1.
+2. Kiểm cấu hình và schema thật (chỉ đọc, không in khóa): `cd apps/api && .venv/Scripts/python -m app.preflight`.
+3. Tạo tài khoản giáo viên theo `supabase/seed.sql`.
+4. Chạy ba tiến trình, mỗi cái một cửa sổ:
 
 ```bash
-make dev-api      # http://localhost:8000  (tài liệu API: /docs)
+make dev-api      # http://127.0.0.1:8000  (tài liệu API: /docs)
 make dev-board    # ws://localhost:8787
 make dev-web      # http://localhost:5173
 ```
 
-Tạo `WHITEBOARD_JWT_SECRET` bằng `openssl rand -hex 32`.
+Chỉ xem giao diện, chưa cần Supabase/LiveKit: `make dev-web` rồi mở `http://localhost:5173/?preview=teacher` hoặc `?preview=student` (dữ liệu minh họa, chỉ bản development).
+
+### Thử bảng viết không cần dịch vụ thật
+
+```bash
+make dev-board-local   # máy chủ bảng thử, khóa ngẫu nhiên, dữ liệu tạm (xóa khi Ctrl+C)
+make dev-web
+```
+
+Mở `http://localhost:5173/dev/whiteboard`, bấm "Mở tab học sinh", viết ở tab giáo viên và xem tab học sinh nhận nét. Trang có nút ngắt máy chủ 10 giây và treo đường truyền 40 giây để thử mất kết nối.
+
+Thử bằng tablet Android cùng Wi-Fi: `make dev-board-lan LAN_IP=<IP laptop>` và `make dev-web-lan LAN_IP=<IP laptop>`, rồi làm theo [docs/tablet-wifi.md](docs/tablet-wifi.md).
 
 ## Kiểm tra
 
 ```bash
-make test         # API (pytest) và whiteboard-sync (node:test)
-make lint         # ruff, typecheck web và whiteboard-sync
+make test             # API (pytest), máy chủ bảng (node:test), eval E0
+make lint             # ruff, guard thời gian, typecheck web và máy chủ bảng
 make build-web
-PGHOST=localhost PGUSER=postgres ./supabase/tests/run.sh   # migration và RLS
+make test-e2e-smoke   # test trình duyệt Playwright (make test-e2e: bộ đầy đủ)
+PGHOST=localhost PGUSER=postgres ./supabase/tests/run.sh   # migration, RLS (cần PostgreSQL có contrib)
 ```
 
-## Đã có và chưa có
+Cách viết và chạy test: [docs/testing.md](docs/testing.md). Nghiệm thu với dịch vụ thật, tablet và buổi thử 45–60 phút: [docs/acceptance.md](docs/acceptance.md).
 
-Đã có và đã kiểm tra:
-- API: xác thực JWT Supabase, vào phòng (`/api/sessions/{id}/join`) với kiểm tra quyền, trạng thái, khung giờ; chế độ `board` cho tablet không nhận token video; kết thúc buổi học; điểm danh. 13 test.
-- Máy chủ bảng viết: xác thực token, tách phòng theo buổi học, gộp xung đột theo version, kiểm tra Origin, nối lại khi rớt mạng. 14 test.
-- Schema và RLS: học sinh chỉ thấy dữ liệu của mình, không tự nâng quyền, không nộp bài thay bạn; kiểm thử trên PostgreSQL 16.
-- Web: đăng nhập, danh sách buổi học, phòng học (video + bảng), build và typecheck đạt.
+## Còn mở trước khi dạy thật
 
-Chưa có hoặc chưa kiểm thử:
-- **Chưa chạy thử với Supabase, LiveKit thật và bút trên tablet.** Việc đầu tiên nên làm là thử bút Android với bảng viết (xem docs/decisions.md, quyết định 1).
-- Màn hình tạo học sinh, tạo buổi học, giao bài, nộp bài, chữa bài (Giai đoạn 1 và 2). Hiện thêm dữ liệu qua Supabase.
-- Lưu ảnh bảng cuối buổi lên Storage (hiện chỉ tải về máy).
-- Tự đặt `no_show`, nhắc lịch, AI chấm (Giai đoạn 3; mới có schema).
-- PWA (cài như ứng dụng), font Excalidraw tự lưu trữ (hiện tải từ CDN của Excalidraw).
-- Dockerfile và `docker-compose.yml` chưa được build thử.
-- Phần bảng viết và video của web khá nặng (riêng `Whiteboard` khoảng 1,1 MB, nén gzip 345 KB, cộng thêm các gói phụ của Excalidraw); chỉ tải khi vào phòng. Cần đo lại trên mạng 4G thật.
+- **Token video:** token cấp trước khi kết thúc buổi vẫn vào lại được phòng đã xóa trên LiveKit Cloud (T3/T3B). Chờ đo thêm (T8b/T15) rồi làm nhãn danh tính. Xem [docs/design-video-token.md](docs/design-video-token.md).
+- Migration `0009_weekly_slots.sql` chưa áp lên Supabase thật.
+- Chưa chạy toàn luồng với Supabase/LiveKit thật, chưa thử bút trên tablet Android, chưa thử sao lưu/khôi phục, chưa chốt thời hạn giữ dữ liệu đã xóa trong bản sao lưu.
+- Giao diện Excalidraw còn tiếng Anh. Dockerfile và `docker-compose.yml` chưa build thử.
 
-## Bảo mật cần nhớ
+## Bảo mật
 
-- `.env` không bao giờ được commit (đã nằm trong `.gitignore`).
-- `SUPABASE_SERVICE_ROLE_KEY` và `LIVEKIT_API_SECRET` chỉ ở máy chủ. Web chỉ dùng khóa anon của Supabase.
-- Ảnh bài làm của học sinh là dữ liệu cá nhân, có thể của trẻ vị thành niên: cần sự đồng ý của phụ huynh (`students.consent_at`), không ghi hình mặc định, và nên đối chiếu Nghị định 13/2023 về bảo vệ dữ liệu cá nhân.
-- Xác thực API hiện dùng JWT HS256 của Supabase. Dự án Supabase mới có thể dùng khóa bất đối xứng (JWKS), khi đó cần đổi ở `apps/api/app/auth.py`.
+- Không commit file môi trường (`.env`, `.env.*`, trừ `.env.example`).
+- `SUPABASE_SERVICE_ROLE_KEY`, `LIVEKIT_API_SECRET`, `WHITEBOARD_JWT_SECRET` chỉ ở `apps/api` và `services/whiteboard-sync`. Web chỉ dùng khóa anon của Supabase.
+- Mọi bảng bật RLS; mọi thao tác ghi đi qua API. Vai trò lấy từ bảng `profiles`, không tin claim trong JWT. API trả 404 khi người dùng không có quyền với một buổi học.
+- Ảnh bài làm và ghi chú là dữ liệu cá nhân, có thể của trẻ vị thành niên: cần sự đồng ý của phụ huynh (`students.consent_at`), không ghi hình mặc định, không log nội dung bài làm, đối chiếu Nghị định 13/2023 về bảo vệ dữ liệu cá nhân.

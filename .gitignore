@@ -34,3 +34,11 @@ supabase/.temp/
 
 # Claude Code: cài đặt riêng từng máy
 .claude/settings.local.json
+
+# Playwright (test trình duyệt)
+test-results/
+playwright-report/
+blob-report/
+
+# Báo cáo eval sinh khi chạy (chỉ dữ liệu tổng hợp, không commit kết quả máy riêng)
+/evals/reports/

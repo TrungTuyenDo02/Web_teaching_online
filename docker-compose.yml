@@ -4,6 +4,9 @@ services:
   api:
     build: ./apps/api
     env_file: .env
+    environment:
+      # Trong Docker, API gọi máy chủ bảng viết qua tên dịch vụ để đóng phòng khi kết thúc buổi
+      WHITEBOARD_INTERNAL_URL: http://whiteboard-sync:8787
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -11,6 +14,13 @@ services:
   whiteboard-sync:
     build: ./services/whiteboard-sync
     env_file: .env
+    environment:
+      WHITEBOARD_DATA_DIR: /srv/data
+    volumes:
+      - board-data:/srv/data
     ports:
       - "8787:8787"
     restart: unless-stopped
+
+volumes:
+  board-data:

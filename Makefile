@@ -35,7 +35,21 @@ dev-web: ## Chạy web
 dev-board: ## Chạy máy chủ đồng bộ bảng viết
 	cd services/whiteboard-sync && npm run dev
 
-test: test-api test-board ## Chạy toàn bộ test
+dev-board-local: ## Máy chủ bảng thử cục bộ cho /dev/whiteboard (khóa ngẫu nhiên, dữ liệu tạm)
+	cd services/whiteboard-sync && npm run dev:local
+
+# Thử bảng bằng tablet cùng Wi-Fi: make dev-board-lan LAN_IP=192.168.1.9 (cửa sổ 1) và make dev-web-lan LAN_IP=192.168.1.9 (cửa sổ 2)
+WEB_PORT ?= 5173
+require-lan-ip:
+	$(if $(LAN_IP),,$(error Thiếu LAN_IP (IP Wi-Fi của laptop, xem ipconfig), vd. make dev-board-lan LAN_IP=192.168.1.9))
+
+dev-board-lan: require-lan-ip ## Máy chủ bảng thử mở cho Wi-Fi: LAN_IP=<IP laptop> [WEB_PORT=5173], in mã ghép nối
+	cd services/whiteboard-sync && npm run dev:local -- --lan=$(LAN_IP) --web-port=$(WEB_PORT)
+
+dev-web-lan: require-lan-ip ## Web dev mở cho Wi-Fi (không nạp file môi trường): LAN_IP=<IP laptop> [WEB_PORT=5173]
+	cd apps/web && LAN_IP=$(LAN_IP) npm run dev -- --mode lan --port $(WEB_PORT) --strictPort
+
+test: test-api test-board test-evals ## Chạy toàn bộ test cục bộ và eval xác định
 
 test-api:
 	cd apps/api && ../../$(BIN)/pytest
@@ -43,13 +57,23 @@ test-api:
 test-board:
 	cd services/whiteboard-sync && npm test
 
+test-evals: ## Eval E0 xác định (không gọi AI hay đọc bí mật)
+	$(BIN)/python -m evals.run --suite E0
+
 lint: ## Kiểm tra kiểu code và định dạng
-	$(BIN)/ruff check apps/api
-	$(BIN)/ruff format --check apps/api
+	$(BIN)/ruff check --config apps/api/pyproject.toml apps/api evals
+	$(BIN)/ruff format --check --config apps/api/pyproject.toml apps/api evals
+	$(BIN)/python apps/api/scripts/check_time_usage.py
 	cd apps/web && npm run typecheck
 	cd services/whiteboard-sync && npm run typecheck
+
+test-e2e-smoke: ## Test trình duyệt nhóm @smoke (Playwright, dữ liệu giả, không gọi dịch vụ thật)
+	cd apps/web && npm run test:e2e:smoke
+
+test-e2e: ## Test trình duyệt đầy đủ, gồm nhóm @slow
+	cd apps/web && npm run test:e2e
 
 build-web: ## Build web
 	cd apps/web && npm run build
 
-.PHONY: help install install-api install-web install-board dev-api dev-web dev-board test test-api test-board lint build-web
+.PHONY: help install install-api install-web install-board dev-api dev-web dev-board dev-board-local dev-board-lan dev-web-lan require-lan-ip test test-api test-board test-evals test-e2e test-e2e-smoke lint build-web
