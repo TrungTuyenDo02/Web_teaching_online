@@ -406,6 +406,22 @@ flowchart TD
 
 Học sinh và giáo viên khác không đọc được note qua API hoặc PostgREST/RLS. Ghi chú riêng không thay `summary`/`homework_note` ở lịch sử học sinh. Danh mục chủ đề thuộc GV; chỉ liên kết vào buổi completed mới biểu thị đã dạy. Chưa có Tutor hoặc truy xuất tài liệu. Khung giờ tháng luôn theo Việt Nam dù đổi ngôn ngữ hiển thị.
 
+## 8d. Linh vật trợ giúp sử dụng ứng dụng
+
+```mermaid
+flowchart TD
+  A[Người dùng đăng nhập, vai trò đọc từ profiles] --> B[Mở linh vật trong khung trang]
+  B --> C[Nhập câu hỏi hoặc chọn câu gợi ý]
+  C --> D{Vai trò hiện tại}
+  D -->|Giáo viên| E[Hướng dẫn học sinh, lịch, báo cáo, ghi chú]
+  D -->|Học sinh| F[Hướng dẫn lịch của mình, vào lớp, lịch sử, bảng]
+  E --> G[Trả hướng dẫn cố định và lối tắt phù hợp]
+  F --> G
+  G --> H[Người dùng tự thao tác trên trang nghiệp vụ hiện có]
+```
+
+Đây là trợ giúp thao tác cục bộ theo yêu cầu chủ dự án, chưa phải Teacher-Ops/Tutor AI. Không gọi model hay truy vấn dữ liệu cá nhân qua chat, không ghi thay người dùng. Hội thoại chỉ ở bộ nhớ component, mất khi rời trang/tải lại/đổi tài khoản; không lưu vào localStorage/DB/log. Lối tắt không thay kiểm quyền API/RLS. Linh vật chỉ nằm trong AppShell, không che vùng bảng/phòng học, có thu gọn và hỗ trợ bàn phím/giảm chuyển động. Phần AI cần đi theo platform-workflow và chọn provider/phạm vi riêng.
+
 ## 9. Lộ trình các giai đoạn
 
 ```mermaid

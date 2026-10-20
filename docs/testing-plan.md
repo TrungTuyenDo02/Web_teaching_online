@@ -4,6 +4,8 @@ Trạng thái 2026-10-20: **đã triển khai bộ test trình duyệt** (Playwr
 
 ## Mục tiêu và phạm vi
 
+Cập nhật riêng 2026-10-21: `e2e/ui/helper.spec.ts` chạy **3/3 đạt** (58,3 s, Chromium, preview/dữ liệu giả). HELP-01: giáo viên hỏi báo cáo, mở đúng trang, focus/Escape; HELP-02: học sinh không có lối tắt quản lý/ghi chú riêng và không giả trả lời kiến thức; HELP-03: khung 360 px, EN, hội thoại mất sau tải lại. Đây là phần trợ giúp thao tác cục bộ, không đo model hoặc thay kiểm quyền API/RLS. Không chạy lại toàn bộ E2E trong phiên thêm linh vật.
+
 Ưu tiên lỗi làm gián đoạn buổi học, sai quyền, mất bảng hoặc xóa nhầm dữ liệu. Phạm vi chỉ Giai đoạn 1. Không đặt chỉ tiêu số lượng test/coverage tùy ý, không kiểm chi tiết nội bộ của Excalidraw/LiveKit, không nhân bản test API chỉ để tăng số lượng.
 
 | Lớp | Hiện có | Việc làm tiếp | Chứng minh được |

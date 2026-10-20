@@ -186,3 +186,10 @@ Mỗi quyết định ghi lý do và điều gì khiến phải xem lại.
 - **Giới hạn:** chưa có lịch cách tuần, nghỉ lễ, sửa giờ lịch (ngừng rồi tạo mới). Kiểm trùng giờ vẫn là đọc rồi ghi. Chưa áp 0009 lên Supabase thật.
 - **Xem lại nếu:** cần ngoại lệ ngày nghỉ, nhiều giáo viên, hoặc Teacher-Ops tạo lịch qua chat (dùng lại cùng router, qua thẻ xác nhận).
 
+## 26. Linh vật trợ giúp trong website, nội dung theo vai trò (2026-10-21)
+
+- **Yêu cầu:** chủ dự án cung cấp hình tham chiếu, chọn bot ở góc website gia sư và xác nhận câu trả lời phải khác nhau giữa giáo viên/học sinh.
+- **Cách làm bước đầu:** ảnh nền trong suốt chuẩn bị từ tham chiếu bằng imagegen (prompt/provenance trong `apps/web/src/assets/helper-mascot.md`), nút mở khung chat trong AppShell, hướng dẫn xác định theo vai trò đọc từ AuthProvider/profiles. Giáo viên có hướng dẫn học sinh/lịch/báo cáo/ghi chú; học sinh có lịch của mình, vào lớp, lịch sử/bảng và trợ giúp tài khoản. Người dùng tự mở và thao tác trên trang hiện có; không tự ghi dữ liệu qua chat. Không gắn vào vùng phòng học/bảng viết.
+- **Riêng tư và giới hạn:** hội thoại chỉ trong bộ nhớ component, mất khi rời trang/tải lại/đổi tài khoản; không log, không lưu DB/localStorage, không gọi model hoặc đọc hồ sơ cá nhân. Trả lời theo hướng dẫn cố định, chưa phải Teacher-Ops/Tutor hay bot giải kiến thức. Chuỗi VI/EN; nút tối thiểu 44 px, thu gọn bằng nút/Escape, tôn trọng giảm chuyển động. Không thêm thư viện/dịch vụ mới.
+- **Bước sau:** nếu cần trao đổi kiến thức hay thao tác nghiệp vụ bằng AI, nối theo `platform-workflow.md`: chọn provider/model/ngân sách/chính sách dữ liệu, kiểm quyền ở API/RLS, thẻ xác nhận ghi và bộ eval thích hợp. Linh vật không tự cấp quyền cho AI đọc ghi chú riêng hoặc giải bài tập của học sinh.
+

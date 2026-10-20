@@ -31,6 +31,7 @@
 | `src/components/BoardViewer.tsx` | Excalidraw chỉ xem cho bảng đã lưu |
 | `src/components/VideoPanel.tsx` | Nơi duy nhất dùng LiveKit ở web |
 | `src/components/Whiteboard.tsx` | Excalidraw: chỉnh bút, chặn chạm nhầm ở đây |
+| `src/components/HelperBot.tsx`, `HelperBot.css`, `src/lib/helperGuide.ts` | Linh vật trợ giúp góc trang trong AppShell, nội dung và lối tắt theo vai trò. Chỉ hướng dẫn xác định; không gọi AI/API, không lưu chat, không tự ghi dữ liệu. Ảnh/provenance ở `src/assets/helper-mascot.*`; E2E `e2e/ui/helper.spec.ts`. Không gắn vào phòng học để tránh che bảng |
 | `src/lib/boardConnection.ts` | Giao thức WebSocket với `services/whiteboard-sync` (chia lô, nối lại, gửi bù, heartbeat ping/pong 5 s/10 s, `verify()` khi quay lại tab); không phụ thuộc React/Excalidraw để test với máy chủ thật |
 | `src/hooks/useBoardSync.ts` | Gắn `BoardConnection` vào Excalidraw (`reconcileElements`), gỡ ảnh chưa đồng bộ được; gọi `verify()` khi tab hiện lại/có mạng/được focus |
 | `src/brand.ts` | Tên, khẩu hiệu (màu ở `src/styles/tokens.css`) |

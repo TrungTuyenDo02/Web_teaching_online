@@ -85,6 +85,7 @@
   --content-max: 1120px;
   --gutter: var(--sp-4);
   --z-header: 10;
+  --z-helper: 20;
   --z-toast: 40;
   --overlay: rgba(42, 39, 96, 0.35);      /* nền mờ sau hộp thoại (ink-900) */
 }

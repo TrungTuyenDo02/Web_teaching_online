@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { brand } from "../brand";
+import HelperBot from "../components/HelperBot";
 import { t } from "../lib/i18n";
 import { Button } from "./Button";
 import { DecorLayer } from "./Decor";
@@ -62,6 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main id="main" className="page" tabIndex={-1}>
         {children}
       </main>
+      <HelperBot />
     </div>
   );
 }

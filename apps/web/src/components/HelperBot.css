@@ -1,0 +1,57 @@
+/* Linh vật ngoài luồng đọc, cửa sổ chat dùng cùng Window/design tokens với ứng dụng. */
+.shell:has(.helper) .page { padding-bottom: calc(var(--sp-12) * 4); }
+.helper {
+  position: fixed; right: max(var(--gutter), env(safe-area-inset-right));
+  bottom: max(var(--gutter), env(safe-area-inset-bottom)); z-index: var(--z-helper);
+}
+.helper__launcher {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-1);
+  border: 0; background: transparent; cursor: pointer; color: var(--ink-900); font: inherit;
+  padding: var(--sp-2); border-radius: var(--radius-md); min-width: var(--touch); min-height: var(--touch);
+}
+.helper__launcher img { width: 100px; height: 120px; object-fit: contain; transition: transform var(--dur-base) var(--ease-bounce); }
+@media (hover: hover) and (pointer: fine) {
+  .helper__launcher:hover img { transform: translateY(-4px) rotate(-4deg); }
+}
+.helper__hello {
+  font-weight: 800; background: var(--bg-window); border: var(--border);
+  border-radius: var(--radius-pill); padding: var(--sp-1) var(--sp-3); box-shadow: var(--shadow-hard-sm);
+}
+.helper__label { font-size: var(--text-sm); font-weight: 900; background: var(--mint-200); border-radius: var(--radius-pill); padding: 0 var(--sp-3); }
+.helper--open { width: min(390px, calc(100vw - var(--gutter) * 2)); }
+.helper .window { box-shadow: var(--shadow-hard-md); }
+.helper .window__body { display: flex; flex-direction: column; padding: 0; max-height: calc(100dvh - var(--gutter) * 2); }
+.helper__intro { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); background: var(--cream-100); }
+.helper__intro img { flex: 0 0 auto; object-fit: contain; }
+.helper__intro .muted { font-size: var(--text-sm); }
+.helper__conversation {
+  display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4);
+  overflow: auto; overscroll-behavior: contain; max-height: 35dvh; min-height: 100px;
+  background: var(--bg-paper); scrollbar-gutter: stable;
+}
+.helper__exchange { display: flex; flex-direction: column; gap: var(--sp-3); }
+.helper__bubble { align-self: flex-start; max-width: 94%; padding: var(--sp-3); background: var(--bg-window); border: var(--border); border-radius: var(--radius-md); overflow-wrap: anywhere; }
+.helper__bubble--user { align-self: flex-end; background: var(--lavender-100); }
+.helper__link { display: flex; margin-top: var(--sp-3); text-align: center; }
+.helper__suggestions { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3); border-top: var(--border); }
+.helper__suggestions .btn { flex: 1 1 44%; font-size: var(--text-sm); }
+.helper__form { display: flex; gap: var(--sp-2); padding: 0 var(--sp-3) var(--sp-3); }
+.helper__input { width: 100%; min-width: 0; min-height: var(--touch); padding: var(--sp-2); border: var(--border); border-radius: var(--radius-sm); background: var(--bg-window); color: var(--ink-900); font: inherit; }
+.helper__privacy { color: var(--ink-700); font-size: var(--text-sm); padding: 0 var(--sp-3) var(--sp-3); }
+@media (max-width: 640px) {
+  .helper__launcher img { width: 72px; height: 86px; }
+  .helper__hello { font-size: var(--text-sm); }
+  .helper__intro img { width: 44px; height: 52px; }
+  .helper__intro { padding: var(--sp-2) var(--sp-3); }
+  .helper__conversation { max-height: 30dvh; }
+}
+@media (max-height: 580px) {
+  .helper__intro { display: none; }
+  .helper__conversation { min-height: 64px; max-height: 27dvh; }
+  .helper__suggestions { flex-wrap: nowrap; overflow-x: auto; flex-shrink: 0; }
+  .helper__suggestions .btn { flex: 0 0 auto; }
+  .helper__privacy { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .helper__launcher img { transition: none; transform: none; }
+}
