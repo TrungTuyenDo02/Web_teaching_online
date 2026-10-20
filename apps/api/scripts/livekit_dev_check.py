@@ -14,6 +14,8 @@ Chuẩn bị:
 Chạy từ `apps/api`:
     python -m scripts.livekit_dev_check --dev-url wss://<du-an-dev>.livekit.cloud T1 T2 T3
     python -m scripts.livekit_dev_check --dev-url ... T8 --minutes 1 6 12 30 60
+    python -m scripts.livekit_dev_check --dev-url ... T8B --minutes 1 6 12 20 30 45 60
+    python -m scripts.livekit_dev_check --dev-url ... T15 --minutes 60
 
 Mỗi bước dùng phòng tạm `devcheck-<hex>` và danh tính giả `devcheck-a`/`devcheck-b`, không dùng
 dữ liệu học sinh, xóa phòng khi xong. In kết quả để chép vào bảng trong docs/acceptance.md.
@@ -202,6 +204,66 @@ async def t8(s, room, args):
     return "; ".join(lines) + " (ghi lại lúc thu hồi hết hiệu lực, nếu có)"
 
 
+async def t8b(s, room, args):
+    """Như T8 nhưng B ở trong phòng suốt lúc đo: T8 thấy phòng trống tự đóng sau 6–12 phút nên
+    không đo được thời hạn thu hồi (G2)."""
+    await tokens.ensure_livekit_room(s, room, timedelta(minutes=max(args.minutes) + 10))
+    old = _old_token(s, room, A)
+    keeper = await _connect(s, _token(s, room, B))
+    if isinstance(keeper, str):
+        return f"B giữ phòng: {keeper} (cần vào được mới đo được)"
+    await _revoke(s, room, A)
+    start, lines = time.monotonic(), []
+    try:
+        for minute in sorted(args.minutes):
+            await asyncio.sleep(max(0, start + minute * 60 - time.monotonic()))
+            result = await _try(s, old)
+            lines.append(f"+{minute} phút: {result} (B: {keeper.connection_state})")
+            if result == "VÀO ĐƯỢC":
+                break  # thu hồi đã hết hiệu lực, các mốc sau không cần
+    finally:
+        await keeper.disconnect()
+    return "; ".join(lines) + " (mốc VÀO ĐƯỢC đầu tiên = thu hồi hết hiệu lực)"
+
+
+async def t15(s, room, args):
+    """Phòng `ensure` giữ max(minutes) phút: phòng không ai vào và phòng có người vào 30 s rồi
+    rời. Ghi lúc mỗi phòng tự đóng, theo dõi thêm 10 phút sau hạn đặt."""
+    keep = max(args.minutes)
+    left = f"{room}-roi"
+    t0 = time.monotonic()
+    await tokens.ensure_livekit_room(s, room, timedelta(minutes=keep))
+    await tokens.ensure_livekit_room(s, left, timedelta(minutes=keep))
+    closed: dict[str, float] = {}
+    try:
+        visitor = await _connect(s, _token(s, left, A))
+        if isinstance(visitor, str):
+            return f"vào phòng thứ hai: {visitor} (cần vào được mới đo được)"
+        await asyncio.sleep(30)
+        await visitor.disconnect()
+        while len(closed) < 2 and time.monotonic() - t0 < (keep + 10) * 60:
+            await asyncio.sleep(30)
+            try:
+                names = await _rooms(s)
+            except Exception:  # lỗi mạng một lần không làm mất cả phép đo dài
+                continue
+            for name in (room, left):
+                if name not in names and name not in closed:
+                    closed[name] = (time.monotonic() - t0) / 60
+    finally:
+        await tokens.close_livekit_room(s, left)
+
+    def when(name: str) -> str:
+        if name in closed:
+            return f"tự đóng sau ~{closed[name]:.1f} phút"
+        return f"còn sau {keep + 10} phút"
+
+    return (
+        f"đặt giữ {keep} phút; không ai vào: {when(room)}; "
+        f"có người vào 30 s rồi rời: {when(left)} (ListRooms đọc mỗi 30 s, trễ vài giây)"
+    )
+
+
 async def t9(s, room, _):
     await tokens.ensure_livekit_room(s, room, timedelta(minutes=10))
     result = await _revoke(s, room, A, int(time.time()) + 30)
@@ -263,7 +325,7 @@ async def t14(s, room, _):
 
 
 STEPS = {"T1": t1, "T2": t2, "T3": t3, "T3B": t3b, "T5": t5, "T6": t6, "T7": t7, "T8": t8, "T9": t9}
-STEPS |= {"T11": t11, "T12": t12, "T13": t13, "T14": t14}
+STEPS |= {"T8B": t8b, "T11": t11, "T12": t12, "T13": t13, "T14": t14, "T15": t15}
 
 
 async def main() -> None:

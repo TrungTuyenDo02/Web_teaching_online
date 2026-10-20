@@ -85,6 +85,18 @@ def test_t8_reports_when_revocation_expires_in_model(offline, rooms):
     assert f"+1 phút: {REJECTED}" in out and "+12 phút: VÀO ĐƯỢC" in out
 
 
+def test_t8b_keeps_b_in_room_and_stops_at_first_rejoin(offline):
+    out = offline("T8B", minutes=(1, 12, 30))  # mô hình giữ thu hồi 660 s
+    assert f"+1 phút: {REJECTED}" in out and "+12 phút: VÀO ĐƯỢC" in out
+    assert "(B: connected)" in out and "+30 phút" not in out
+
+
+def test_t15_reports_rooms_still_open_in_model(offline, rooms):
+    out = offline("T15", minutes=(5,))  # mô hình không tự đóng phòng
+    assert "không ai vào: còn sau 15 phút" in out and "rồi rời: còn sau 15 phút" in out
+    assert f"{ROOM}-roi" not in rooms.lk.rooms  # phòng thứ hai được dọn
+
+
 def test_t11_t12_room_listing(offline):
     assert "ListRooms thấy phòng" in offline("T11")
     out = offline("T12")
