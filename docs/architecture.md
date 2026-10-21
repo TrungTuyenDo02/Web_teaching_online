@@ -11,12 +11,14 @@ Modular monolith cộng dịch vụ có sẵn: một API nhỏ, một máy chủ
 | Máy chủ bảng viết | Node, ws, jose | Đồng bộ nét vẽ Excalidraw theo buổi học | Khóa kiểm tra token bảng viết |
 | Dữ liệu | Supabase (PostgreSQL, Auth, Storage) | Hồ sơ, buổi học, bài tập, ảnh bài làm; RLS chặn truy cập chéo | |
 | Video | LiveKit | Camera, micro (WebRTC) | |
+| Bot trợ giúp | OpenAI Responses qua httpx ở API; PostgreSQL full-text RAG | Tool chỉ đọc hướng dẫn/bài giảng đúng quyền; tắt mặc định, không lưu transcript; chưa đo model thật | Khóa OpenAI chỉ ở API |
 | AI (GĐ3) | Chưa chọn | Gợi ý chấm, giáo viên duyệt | Khóa API của nhà cung cấp |
 
 ## Ranh giới tin cậy
 
 - Trình duyệt không bao giờ được tin. Quyền đọc dữ liệu do RLS quyết định ở cơ sở dữ liệu. Các thao tác nhạy cảm (vào phòng, điểm danh, kết thúc buổi) đi qua API, không ghi trực tiếp từ trình duyệt.
 - API dùng khóa service role nên bỏ qua RLS: mọi kiểm tra quyền phải nằm trong code API (`_load_session_for_member`) và có test.
+- Bot chỉ cho model đề xuất truy vấn tìm kiếm. Actor/vai trò lấy từ phiên và profiles, không nhận từ tool args. RPC 0010 chỉ service_role được gọi, lọc bài giảng trước khi gửi provider; kiểm lại nguồn sau khi sinh câu trả lời. Không gửi ghi chú riêng/hồ sơ tự động. Cấu hình, dữ liệu và giới hạn: [assistant.md](assistant.md).
 - Token bảng viết sống ít nhất 2 giờ theo cấu hình mặc định, được kéo dài tới hết khung giờ vào phòng nếu cần, mang theo id buổi học; máy chủ bảng viết chỉ cho kết nối vào đúng phòng đó. Dấu đóng/xóa lưu trên đĩa chặn token cũ sau khi kết thúc, kể cả khi khởi động lại máy chủ bảng.
 - Token video cũng lấy thời hạn lớn hơn giữa cấu hình (mặc định 2 giờ) và thời gian còn lại tới hết khung giờ vào phòng. Một lần thu hồi chưa chặn được toàn bộ thời hạn token trên Cloud; lỗi còn mở, xem [design-video-token.md](design-video-token.md) mục 9.3. Chưa áp dụng hướng sửa mới.
 

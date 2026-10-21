@@ -2,7 +2,7 @@
 
 Nền tảng dạy học trực tuyến 1-1 cho một giáo viên và nhiều học sinh: phòng học video, bảng viết đồng bộ (giáo viên viết bằng bút trên tablet Android), quản lý học sinh, lịch và báo cáo buổi học. Học sinh có thể là trẻ vị thành niên nên quyền riêng tư là yêu cầu hàng đầu.
 
-**Trạng thái (2026-10-21):** Giai đoạn 1 đã có các chức năng chính và test tự động, **chưa nghiệm thu** với dịch vụ thật và tablet thật; lỗi token video vẫn mở. Phần mở rộng theo [TUTOR_PLATFORM_SPEC.md](TUTOR_PLATFORM_SPEC.md) đã code/test cục bộ M0 nền và M1a (báo cáo tháng, ghi chú riêng, lịch hằng tuần); migration 0009 chưa áp thật, M1b–M5 chưa làm. Chi tiết: [docs/progress.md](docs/progress.md).
+**Trạng thái (2026-10-21):** Giai đoạn 1 đã có chức năng chính và test tự động, **chưa nghiệm thu** với dịch vụ thật/tablet; lỗi token video vẫn mở. M0 nền và M1a (báo cáo, ghi chú riêng, lịch tuần) đã code/test cục bộ. Bot OpenAI + RAG chỉ đọc đã có code, tắt mặc định và chưa thử model thật; migration 0009/0010 chưa áp thật theo sổ. Chưa hoàn thành M1b–M5. Chi tiết: [docs/progress.md](docs/progress.md), [bot AI](docs/assistant.md).
 
 ## Chức năng
 
@@ -13,7 +13,7 @@ Nền tảng dạy học trực tuyến 1-1 cho một giáo viên và nhiều h�
 | Học sinh | Tạo tài khoản, sửa, ngừng dạy, xóa hẳn (dọn Auth, Storage, bảng; làm tiếp được nếu lỗi giữa chừng) |
 | Quản lý (M1a) | Báo cáo số buổi theo tháng + CSV; ghi chú riêng của giáo viên và chủ đề đã dạy (xuất Markdown/CSV); lịch hằng tuần tự sinh buổi 28 ngày, chống sinh trùng ở DB |
 | Giao diện | Tiếng Việt/tiếng Anh, trang giới thiệu cho khách, dùng được trên điện thoại và tablet (vùng chạm ≥ 44 px) |
-| Trợ giúp | Linh vật ở góc trang, bấm mở chat hướng dẫn thao tác và lối tắt riêng cho giáo viên/học sinh; chưa kết nối AI hay trả lời kiến thức bài học |
+| Trợ giúp | Linh vật góc trang với hướng dẫn theo vai trò; đã có kết nối OpenAI và RAG bài giảng văn bản, tắt mặc định. [Cách bật và giới hạn](docs/assistant.md) |
 
 Chưa có: giao, nộp, chữa bài; trợ lý giáo viên (Teacher-Ops); AI chấm bài; Tutor. Không ghi hình buổi học.
 
@@ -26,8 +26,8 @@ apps/
 services/
   whiteboard-sync/    Node 22 + ws: đồng bộ nét vẽ giữa các thiết bị, lưu bảng
 supabase/
-  migrations/         Schema PostgreSQL, RLS, bucket (0001 → 0009)
-  rollback/           Gỡ thủ công 0008, 0009 (chỉ khi bảng trống)
+  migrations/         Schema PostgreSQL, RLS, bucket (0001 → 0010)
+  rollback/           Gỡ thủ công 0008–0010 (chỉ khi dữ liệu tương ứng trống)
   tests/              Kiểm thử migration, RLS, giao dịch hai kết nối
 evals/                Eval xác định (E0: thời gian nghiệp vụ)
 docs/                 Tiến độ, luồng, kiến trúc, quyết định, nghiệm thu, kiểm thử
@@ -39,6 +39,7 @@ Tài liệu nên đọc: [docs/progress.md](docs/progress.md) (đang làm gì, v
 |---|---|
 | Hiện trạng và thứ tự công việc | [docs/progress.md](docs/progress.md) — nguồn bàn giao duy nhất |
 | Thử bảng trên laptop và tablet | [docs/tablet-wifi.md](docs/tablet-wifi.md) |
+| Bật bot OpenAI, thêm bài giảng và kiểm nguồn | [docs/assistant.md](docs/assistant.md) |
 | Nghiệm thu, migration thật, backup/restore | [docs/acceptance.md](docs/acceptance.md); [supabase/verify_migrations.sql](supabase/verify_migrations.sql) chỉ kiểm tra, không áp migration |
 | Lỗi token video và kết quả T8b/T15 | [docs/design-video-token.md](docs/design-video-token.md), mục 9.3 |
 | Chạy test hoặc đọc kết quả đã ghi | [docs/testing.md](docs/testing.md), [docs/testing-plan.md](docs/testing-plan.md) |

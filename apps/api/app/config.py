@@ -39,6 +39,16 @@ class Settings(BaseSettings):
 
     recording_enabled: bool = False
 
+    # AI tắt mặc định; key/model chỉ ở API, không đưa vào cấu hình web.
+    assistant_enabled: bool = False
+    openai_api_key: str = ""
+    openai_chat_model: str = ""
+    assistant_daily_user_turns: int = 20
+    assistant_daily_total_turns: int = 100
+    assistant_max_output_tokens: int = 1000
+    # Chỉ mở bài giảng cho HS sau khi nghiệm thu E6/E7 với model thật.
+    assistant_student_lessons_enabled: bool = False
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

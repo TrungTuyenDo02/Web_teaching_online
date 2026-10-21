@@ -4,6 +4,8 @@ Trạng thái 2026-10-20: **đã triển khai bộ test trình duyệt** (Playwr
 
 ## Mục tiêu và phạm vi
 
+Cập nhật bot OpenAI/RAG 2026-10-21: `helper.spec.ts` + `assistant.spec.ts` **6/6 đạt** (24,6 s), API toàn bộ **257 đạt** (15 ca assistant dùng provider giả). Kiểm consent, nguồn, quota/giữ nháp, AI tắt, vai trò HS và biểu mẫu thêm/gỡ bài giảng. PostgreSQL 18 cục bộ áp đủ 10 migration, verify **22/22**, `90_rls_test.sql` đạt; hai kết nối giữ cùng hạn mức 1 chỉ một thành công; rollback 0010 từ chối khi có usage, gỡ trống/áp lại đạt. `run.sh` chuẩn dừng do psql Windows trả `t\r` thay `t`, nên chưa báo toàn bộ runner RLS đạt. Chưa chạy lại toàn E2E hoặc kiểm model thật; E1/E6/E7 `not_run`. Chi tiết phạm vi: [assistant.md](assistant.md).
+
 Cập nhật riêng 2026-10-21: `e2e/ui/helper.spec.ts` chạy **3/3 đạt** (58,3 s, Chromium, preview/dữ liệu giả). HELP-01: giáo viên hỏi báo cáo, mở đúng trang, focus/Escape; HELP-02: học sinh không có lối tắt quản lý/ghi chú riêng và không giả trả lời kiến thức; HELP-03: khung 360 px, EN, hội thoại mất sau tải lại. Đây là phần trợ giúp thao tác cục bộ, không đo model hoặc thay kiểm quyền API/RLS. Không chạy lại toàn bộ E2E trong phiên thêm linh vật.
 
 Ưu tiên lỗi làm gián đoạn buổi học, sai quyền, mất bảng hoặc xóa nhầm dữ liệu. Phạm vi chỉ Giai đoạn 1. Không đặt chỉ tiêu số lượng test/coverage tùy ý, không kiểm chi tiết nội bộ của Excalidraw/LiveKit, không nhân bản test API chỉ để tăng số lượng.

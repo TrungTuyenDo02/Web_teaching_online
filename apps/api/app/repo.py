@@ -8,6 +8,7 @@ from typing import Any, Protocol
 import httpx
 from fastapi import Depends
 
+from app.assistant_models import AssistantMaterial, MaterialInput
 from app.config import Settings, get_settings
 from app.core import time as clock
 from app.models import (
@@ -33,6 +34,20 @@ class AuthAdminError(Exception):
 
 
 class Repository(Protocol):
+    async def list_assistant_materials(self, actor_id: str) -> list[AssistantMaterial]: ...
+
+    async def create_assistant_material(
+        self, actor_id: str, body: MaterialInput
+    ) -> AssistantMaterial | None: ...
+
+    async def delete_assistant_material(self, actor_id: str, material_id: str) -> bool: ...
+
+    async def search_assistant_chunks(self, actor_id: str, query: str) -> list[dict]: ...
+
+    async def reserve_assistant_turn(
+        self, actor_id: str, day: date, user_limit: int, total_limit: int
+    ) -> bool: ...
+
     async def list_weekly_slots(self, teacher_id: str) -> list[WeeklySlot]: ...
 
     async def list_all_weekly_slots(self) -> list[WeeklySlot]:
@@ -217,6 +232,65 @@ class SupabaseRepository:
             "apikey": settings.supabase_service_role_key,
             "Authorization": f"Bearer {settings.supabase_service_role_key}",
         }
+
+    async def _assistant_rpc(self, name: str, body: dict) -> Any:
+        async with httpx.AsyncClient(timeout=10) as client:
+            result = await client.post(f"{self._base}/rpc/{name}", headers=self._headers, json=body)
+            result.raise_for_status()
+            return result.json()
+
+    async def list_assistant_materials(self, actor_id: str) -> list[AssistantMaterial]:
+        rows = await self._pages(
+            "rpc/assistant_materials_for_actor",
+            {"p_actor": actor_id, "order": "created_at.desc,id.asc"},
+        )
+        return [AssistantMaterial.model_validate(row) for row in rows]
+
+    async def create_assistant_material(
+        self, actor_id: str, body: MaterialInput
+    ) -> AssistantMaterial | None:
+        rows = await self._assistant_rpc(
+            "create_assistant_material",
+            {
+                "p_actor": actor_id,
+                "p_topic": str(body.topic_id),
+                "p_title": body.title,
+                "p_content": body.content,
+                "p_visible": body.student_visible,
+            },
+        )
+        return AssistantMaterial.model_validate(rows[0]) if rows else None
+
+    async def delete_assistant_material(self, actor_id: str, material_id: str) -> bool:
+        async with httpx.AsyncClient(timeout=10) as client:
+            result = await client.delete(
+                f"{self._base}/assistant_materials",
+                headers=self._headers | {"Prefer": "return=representation"},
+                params={"id": f"eq.{material_id}", "teacher_id": f"eq.{actor_id}"},
+            )
+            result.raise_for_status()
+            return bool(result.json())
+
+    async def search_assistant_chunks(self, actor_id: str, query: str) -> list[dict]:
+        return await self._assistant_rpc(
+            "search_assistant_chunks", {"p_actor": actor_id, "p_query": query}
+        )
+
+    async def reserve_assistant_turn(
+        self, actor_id: str, day: date, user_limit: int, total_limit: int
+    ) -> bool:
+        return (
+            await self._assistant_rpc(
+                "reserve_assistant_turn",
+                {
+                    "p_actor": actor_id,
+                    "p_day": day.isoformat(),
+                    "p_user_limit": user_limit,
+                    "p_global_limit": total_limit,
+                },
+            )
+            is True
+        )
 
     async def _pages(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

@@ -420,7 +420,26 @@ flowchart TD
   G --> H[Người dùng tự thao tác trên trang nghiệp vụ hiện có]
 ```
 
-Đây là trợ giúp thao tác cục bộ theo yêu cầu chủ dự án, chưa phải Teacher-Ops/Tutor AI. Không gọi model hay truy vấn dữ liệu cá nhân qua chat, không ghi thay người dùng. Hội thoại chỉ ở bộ nhớ component, mất khi rời trang/tải lại/đổi tài khoản; không lưu vào localStorage/DB/log. Lối tắt không thay kiểm quyền API/RLS. Linh vật chỉ nằm trong AppShell, không che vùng bảng/phòng học, có thu gọn và hỗ trợ bàn phím/giảm chuyển động. Phần AI cần đi theo platform-workflow và chọn provider/phạm vi riêng.
+Luồng trên là chế độ Hướng dẫn cục bộ. Chế độ Hỏi AI đã có code, tắt mặc định. Hội thoại chỉ ở bộ nhớ component, không lưu vào localStorage/DB/log. Linh vật chỉ nằm trong AppShell, không che vùng bảng/phòng học.
+
+```mermaid
+flowchart TD
+  A[Chọn Hỏi AI] --> B{API đã bật và có cấu hình?}
+  B -->|Không| C[Hiện chưa bật; vẫn dùng được Hướng dẫn]
+  B -->|Có| D[Đồng ý gửi câu hỏi và trích đoạn sang OpenAI]
+  D --> E[API xác thực JWT, đọc profiles, giữ quota ngày VN trong DB]
+  E --> F[OpenAI đề xuất tool search_knowledge]
+  F --> G[API kiểm schema; tìm hướng dẫn đúng vai trò và bài giảng đúng actor]
+  G --> H{Có nguồn phù hợp?}
+  H -->|Không| I[Thông báo chưa tìm được]
+  H -->|Có| J[OpenAI sinh câu trả lời từ trích đoạn có số nguồn]
+  J --> K[Kiểm số nguồn; kiểm đầu ra bài giảng HS nếu được bật]
+  K --> L[Kiểm lại quyền nguồn, trả câu trả lời và liên kết]
+  M[GV nhập bài giảng qua form và gắn chủ đề] --> N[RPC kiểm sở hữu, lưu tài liệu và chunk nguyên tử]
+  N --> G
+```
+
+Học sinh chỉ có hướng dẫn ứng dụng khi cờ bài giảng HS tắt. Khi bật, bài giảng phải được công bố và thuộc chủ đề đã dạy trong buổi completed của đúng học sinh/GV. Chưa dùng embedding hoặc đọc PDF; chưa kiểm model thật E6/E7. Agent không có tool ghi nghiệp vụ; lỗi provider/guard/nguồn được chặn. Xem [assistant.md](assistant.md); chưa hoàn tất M1b/M4.
 
 ## 9. Lộ trình các giai đoạn
 

@@ -16,6 +16,8 @@ Xác thực JWT Supabase, kiểm tra quyền với buổi học, cấp token Liv
 | `app/auth.py` | `get_current_user` → `AuthUser` (ES256 qua JWKS cho dự án mới, HS256 nếu có `SUPABASE_JWT_SECRET`) |
 | `app/models.py` | Enum `Role`, `DeviceMode`, `SessionStatus`; model hàng DB và request/response |
 | `app/repo.py` | `Repository` (Protocol), `SupabaseRepository` (PostgREST), `get_repo` |
+| `app/assistant_models.py`, `app/routers/assistant.py` | Chat chỉ đọc, trạng thái cấu hình, quản lý bài giảng văn bản; quyền từ profiles, nguồn qua Repository/RPC 0010. Test offline `tests/test_assistant.py` |
+| `app/services/llm.py`, `app/services/assistant.py` | Gateway OpenAI Responses duy nhất và tool search_knowledge; lọc nguồn trước khi gửi, quota DB, không log/lưu chat. Hướng dẫn `docs/assistant.md`; không coi test giả là eval model thật |
 | `app/routers/` | `health`, `me`, `sessions` (tạo, `cancel`, `join`, `end`; `require_teacher`), `students` (danh sách, thêm, sửa, xóa hẳn, `account`) |
 | `app/services/tokens.py` | Nơi duy nhất gọi LiveKit SDK (token, tạo phòng, thu hồi token rồi xóa phòng, liệt kê phòng) qua `_livekit`, và ký token bảng viết (vào phòng, đóng phòng). Thiết kế: `docs/design-video-token.md` |
 | `app/preflight.py` | `python -m app.preflight`: kiểm tra chỉ đọc cấu hình, migration 0004–0007, bucket, JWKS, máy chủ bảng, LiveKit; không in URL/khóa |

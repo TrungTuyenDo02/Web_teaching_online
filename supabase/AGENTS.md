@@ -17,6 +17,7 @@
 | `rollback/0008_private_teaching_notes.sql` | Chỉ gỡ 0008 khi cả 3 bảng trống; có dữ liệu thì dừng. Không tự chạy trên dịch vụ thật |
 | `tests/teaching_notes_test.sh`, `tests/teaching_notes_rollback_test.sh` | Hai kết nối thật kiểm CAS/lưu trong lúc xóa; rollback chặn dữ liệu, gỡ trống và áp lại. `run.sh` gọi cả hai |
 | `migrations/0009_weekly_slots.sql` | Lịch cố định hằng tuần (`weekly_slots`, chỉ GV sở hữu đọc, chỉ API ghi); `sessions.slot_id/slot_date` unique: mỗi ngày của lịch một buổi, nhiều tiến trình sinh cùng lúc vẫn không trùng |
+| `migrations/0010_assistant_rag.sql`, `rollback/0010_assistant_rag.sql` | Bài giảng/chunk full-text, quota người dùng/toàn ứng dụng theo ngày; RLS và RPC service_role lọc tài liệu theo actor/chủ đề đã dạy. Rollback chỉ khi cả dữ liệu lẫn bộ đếm trống. `90_rls_test.sql` kiểm đủ bốn bảng mới |
 | `rollback/0009_weekly_slots.sql`, `tests/weekly_slots_rollback_test.sh` | Chỉ gỡ 0009 khi chưa có lịch nào; có lịch thì dừng. `run.sh` gọi test |
 | `seed.sql` | Hướng dẫn tạo dữ liệu mẫu (không chứa dữ liệu thật) |
 | `tests/00_supabase_stub.sql` | Giả lập schema `auth`, `storage` để chạy trên PostgreSQL thường |
@@ -24,7 +25,7 @@
 | `tests/run.sh` | Tạo DB tạm, áp mọi migration, chạy test RLS và `handshake_test.sh`; CI chạy ở job `rls` (`postgres:16`) |
 | `tests/handshake_test.sh` | Hai kết nối `psql` độc lập, đủ 6 thứ tự xen kẽ của bắt tay lưu bảng/xóa học sinh (quyết định 19). Thoát 1 khi vi phạm bất biến, 2 khi psql lỗi/kết nối đóng/quá giờ/kết quả không phải đúng `0` hoặc `1` |
 | `tests/handshake_negative_test.sh` | Ca âm: chứng minh `handshake_test.sh` không báo đạt khi SQL lỗi, kết nối đóng, treo, kết quả lạ, ghi hụt, bắt tay viết sai |
-| `verify_migrations.sql` | Kiểm tra chỉ đọc sau khi áp 0003–0007 lên Supabase thật (dán vào SQL Editor), xem `docs/acceptance.md` |
+| `verify_migrations.sql` | Kiểm tra chỉ đọc schema/quyền 0003–0010, hiện 22 mục (dán vào SQL Editor); xem `docs/acceptance.md`, `docs/assistant.md` |
 
 ## Công thức thay đổi schema
 

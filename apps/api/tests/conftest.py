@@ -16,6 +16,7 @@ from livekit import api as lk
 # Không chạy vòng lặp no_show thật trong lifespan khi test (lifespan đọc cấu hình thật)
 os.environ["NO_SHOW_INTERVAL_SECONDS"] = "0"
 
+from app.assistant_models import AssistantMaterial, MaterialInput  # noqa: E402
 from app.config import Settings, get_settings  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import (  # noqa: E402
@@ -60,6 +61,9 @@ def make_settings() -> Settings:
 
 class FakeRepo:
     def __init__(self) -> None:
+        self.assistant_materials: dict[str, AssistantMaterial] = {}
+        self.assistant_usage: dict[tuple[str, date], int] = {}
+        self.assistant_global_usage: dict[date, int] = {}
         now = datetime.now(UTC)
         self.profiles = {
             TEACHER_ID: Profile(id=TEACHER_ID, role=Role.teacher, full_name="Cô Thử"),
@@ -182,6 +186,87 @@ class FakeRepo:
                 update={"status": SessionStatus.cancelled}
             )
         return len(ids)
+
+    async def list_assistant_materials(self, actor_id: str) -> list[AssistantMaterial]:
+        profile = self.profiles.get(actor_id)
+        if not profile:
+            return []
+        if profile.role == Role.teacher:
+            return [m for m in self.assistant_materials.values() if m.teacher_id == actor_id]
+        result = []
+        for material in self.assistant_materials.values():
+            if not material.student_visible:
+                continue
+            for session in self.sessions.values():
+                student = self.students.get(session.student_id)
+                record = self.teaching_records.get(session.id)
+                if (
+                    student
+                    and student.profile_id == actor_id
+                    and student.deleting_at is None
+                    and student.teacher_id == session.teacher_id == material.teacher_id
+                    and session.status == SessionStatus.completed
+                    and record
+                    and material.topic_id in record.topic_ids
+                ):
+                    result.append(material)
+                    break
+        return result
+
+    async def create_assistant_material(
+        self, actor_id: str, body: MaterialInput
+    ) -> AssistantMaterial | None:
+        topic = self.teaching_topics.get(str(body.topic_id))
+        if not topic or topic["teacher_id"] != actor_id:
+            return None
+        from app.core import time as app_clock
+
+        row = AssistantMaterial(
+            id=str(uuid.uuid4()),
+            teacher_id=actor_id,
+            topic_id=str(body.topic_id),
+            title=body.title,
+            content=body.content,
+            student_visible=body.student_visible,
+            created_at=app_clock.now_utc(),
+        )
+        self.assistant_materials[row.id] = row
+        return row
+
+    async def delete_assistant_material(self, actor_id: str, material_id: str) -> bool:
+        row = self.assistant_materials.get(material_id)
+        if not row or row.teacher_id != actor_id:
+            return False
+        del self.assistant_materials[material_id]
+        return True
+
+    async def search_assistant_chunks(self, actor_id: str, query: str) -> list[dict]:
+        import re
+
+        words = re.findall(r"[^\W_]{2,}", query.lower())
+        return [
+            {
+                "material_id": m.id,
+                "sequence": i // 1000,
+                "title": m.title,
+                "content": m.content[i : i + 1200],
+            }
+            for m in await self.list_assistant_materials(actor_id)
+            for i in range(0, len(m.content), 1000)
+            if any(w in m.content[i : i + 1200].lower() for w in words)
+        ][:4]
+
+    async def reserve_assistant_turn(
+        self, actor_id: str, day: date, user_limit: int, total_limit: int
+    ) -> bool:
+        key = (actor_id, day)
+        if self.assistant_usage.get(key, 0) >= max(
+            min(user_limit, 1000), 1
+        ) or self.assistant_global_usage.get(day, 0) >= max(min(total_limit, 10000), 1):
+            return False
+        self.assistant_usage[key] = self.assistant_usage.get(key, 0) + 1
+        self.assistant_global_usage[day] = self.assistant_global_usage.get(day, 0) + 1
+        return True
 
     async def list_teaching_topics(self, teacher_id: str) -> list[TeachingTopic]:
         return [

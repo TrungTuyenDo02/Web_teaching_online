@@ -64,6 +64,19 @@ select muc, dat from (values
         and not has_table_privilege('anon', to_regclass('public.weekly_slots'), 'select') end),
   (16, '0009: sessions có slot_id/slot_date, mỗi ngày của lịch một buổi',
       exists (select 1 from pg_constraint where conname = 'sessions_slot_occurrence_key'
-              and conrelid = 'public.sessions'::regclass and contype = 'u'))
+              and conrelid = 'public.sessions'::regclass and contype = 'u')),
+  (17, '0010: assistant_materials bật RLS, trình duyệt chỉ đọc',
+      coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.assistant_materials')), false)
+      and coalesce(has_table_privilege('authenticated', to_regclass('public.assistant_materials'), 'select'), false)
+      and not coalesce(has_table_privilege('authenticated', to_regclass('public.assistant_materials'), 'insert,update,delete'), false)),
+  (18, '0010: assistant_chunks bật RLS', coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.assistant_chunks')), false)),
+  (19, '0010: assistant_daily_usage bật RLS', coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.assistant_daily_usage')), false)),
+  (20, '0010: assistant_global_usage bật RLS', coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.assistant_global_usage')), false)),
+  (21, '0010: tìm kiếm chỉ service_role',
+      coalesce(has_function_privilege('service_role', to_regprocedure('public.search_assistant_chunks(uuid,text)'), 'execute'), false)
+      and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.search_assistant_chunks(uuid,text)'), 'execute'), true)),
+  (22, '0010: hạn mức chỉ service_role',
+      coalesce(has_function_privilege('service_role', to_regprocedure('public.reserve_assistant_turn(uuid,date,integer,integer)'), 'execute'), false)
+      and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.reserve_assistant_turn(uuid,date,integer,integer)'), 'execute'), true))
 ) as t(stt, muc, dat)
 order by stt;

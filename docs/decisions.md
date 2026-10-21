@@ -193,3 +193,11 @@ Mỗi quyết định ghi lý do và điều gì khiến phải xem lại.
 - **Riêng tư và giới hạn:** hội thoại chỉ trong bộ nhớ component, mất khi rời trang/tải lại/đổi tài khoản; không log, không lưu DB/localStorage, không gọi model hoặc đọc hồ sơ cá nhân. Trả lời theo hướng dẫn cố định, chưa phải Teacher-Ops/Tutor hay bot giải kiến thức. Chuỗi VI/EN; nút tối thiểu 44 px, thu gọn bằng nút/Escape, tôn trọng giảm chuyển động. Không thêm thư viện/dịch vụ mới.
 - **Bước sau:** nếu cần trao đổi kiến thức hay thao tác nghiệp vụ bằng AI, nối theo `platform-workflow.md`: chọn provider/model/ngân sách/chính sách dữ liệu, kiểm quyền ở API/RLS, thẻ xác nhận ghi và bộ eval thích hợp. Linh vật không tự cấp quyền cho AI đọc ghi chú riêng hoặc giải bài tập của học sinh.
 
+## 27. Bot OpenAI chỉ đọc, RAG văn bản lọc quyền trước khi gửi model (2026-10-21)
+
+- **Yêu cầu đã chốt:** chủ dự án chọn OpenAI API; nguồn gồm hướng dẫn ứng dụng và bài giảng giáo viên cung cấp, hành vi khác nhau theo vai trò.
+- **Cách làm:** Responses/function calling qua httpx sẵn có, chỉ tool `search_knowledge`; Repository/RPC 0010 lấy actor từ phiên, vai trò từ profiles. RAG full-text PostgreSQL, chunk trong DB; không thêm vector store, SDK lớn hoặc framework. Giáo viên nhập văn bản gắn chủ đề, không tự lấy note riêng/lời giải tham chiếu. HS cần tài liệu được công bố và chủ đề đã học.
+- **Vận hành:** tắt mặc định, key/model chỉ ở API; quota DB theo người dùng/toàn ứng dụng, trần output mỗi request, không retry tự động. Không lưu transcript, `store:false`; vẫn cần kiểm retention nhà cung cấp. Giới hạn lượt không phải trần tiền.
+- **Nghiệm thu:** API/RLS/UI kiểm cục bộ bằng dữ liệu giả, chưa gọi OpenAI thật. Bài giảng HS tắt riêng chờ E6/E7; bộ kiểm fail-closed không thay eval đối kháng. Chưa hoàn tất Teacher-Ops/Tutor. Cấu hình và giới hạn: [assistant.md](assistant.md).
+- **Xem lại nếu:** cần tìm kiếm ngữ nghĩa, nhập PDF/ảnh, nhiều tài liệu, transcript bền hoặc tool ghi nghiệp vụ; đo chất lượng/chi phí trước khi mở rộng.
+

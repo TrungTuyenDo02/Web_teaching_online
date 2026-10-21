@@ -17,20 +17,23 @@ for migration in "$MIGRATIONS"/*.sql; do
   echo "áp dụng $(basename "$migration")"
   run "$migration"
 done
-# Catalog verifier phải trả đủ 16 mục và tất cả đều đạt, không chỉ chạy SQL không lỗi.
+# Catalog verifier phải trả đủ 22 mục và tất cả đều đạt, không chỉ chạy SQL không lỗi.
 checks="$(psql -X -v ON_ERROR_STOP=1 -q -A -t -d "$DB" -f "$HERE/../verify_migrations.sql")"
 checked=0
 while IFS='|' read -r label result; do
   [ "$result" = t ] || { echo "Kiểm schema KHÔNG đạt: $label ($result)"; exit 1; }
   checked=$((checked + 1))
 done <<< "$checks"
-[ "$checked" = 16 ] || { echo "Thiếu mục kiểm schema: $checked/16"; exit 1; }
-echo 'verify_migrations: 16/16 đạt'
+[ "$checked" = 22 ] || { echo "Thiếu mục kiểm schema: $checked/22"; exit 1; }
+echo 'verify_migrations: 22/22 đạt'
 # pgcrypto phải là bản thật (có contrib), không phải extension rỗng dựng tạm
 psql -v ON_ERROR_STOP=1 -q -A -t -d "$DB" -c "select 'pgcrypto ' || extversion || ' ' || left(gen_salt('bf'), 4) from pg_extension where extname = 'pgcrypto'"
 run "$HERE/90_rls_test.sql" | grep -E 'RLS OK' || { echo "RLS test KHÔNG đạt"; exit 1; }
 bash "$HERE/teaching_notes_test.sh" "$DB" || { echo "Giao dịch ghi chú hai kết nối KHÔNG đạt"; exit 1; }
+# 0010 phụ thuộc chủ đề 0008: gỡ lát mới khi trống trước khi thử gỡ lát cũ, rồi áp lại.
+run "$HERE/../rollback/0010_assistant_rag.sql"
 bash "$HERE/teaching_notes_rollback_test.sh" "$DB" || { echo "Hoàn tác ghi chú KHÔNG đạt"; exit 1; }
+run "$HERE/../migrations/0010_assistant_rag.sql"
 bash "$HERE/weekly_slots_rollback_test.sh" "$DB" || { echo "Hoàn tác lịch cố định KHÔNG đạt"; exit 1; }
 bash "$HERE/handshake_test.sh" "$DB" || { echo "Bắt tay hai kết nối KHÔNG đạt"; exit 1; }
 bash "$HERE/handshake_negative_test.sh" "$DB" || { echo "Kiểm tra âm của bắt tay KHÔNG đạt"; exit 1; }

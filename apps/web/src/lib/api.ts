@@ -194,6 +194,19 @@ export interface WeeklySlotInput {
 
 export const listWeeklySlots = () => apiFetch<WeeklySlot[]>("/api/weekly-slots");
 
+export interface AssistantStatus { enabled: boolean; student_lessons: boolean; daily_limit: number }
+export interface AssistantSource { id: string; title: string; excerpt: string; path: string; kind: "guide" | "lesson" }
+export interface AssistantAnswer { answer: string; sources: AssistantSource[]; mode: "openai" }
+export interface AssistantMaterial { id: string; teacher_id: string; topic_id: string; title: string; content: string; student_visible: boolean; created_at: string }
+export type AssistantMaterialInput = Pick<AssistantMaterial, "topic_id" | "title" | "content" | "student_visible">;
+export const assistantStatus = () => apiFetch<AssistantStatus>("/api/assistant/status");
+export const askAssistant = (body: { question: string; language: "vi" | "en"; consent: true; history: { question: string; answer: string }[] }, signal?: AbortSignal) =>
+  apiFetch<AssistantAnswer>("/api/assistant/chat", { method: "POST", body: JSON.stringify(body), signal });
+export const listAssistantMaterials = () => apiFetch<AssistantMaterial[]>("/api/assistant/materials");
+export const getAssistantMaterial = (id: string) => apiFetch<AssistantMaterial>(`/api/assistant/materials/${id}`);
+export const createAssistantMaterial = (body: AssistantMaterialInput) => apiFetch<AssistantMaterial>("/api/assistant/materials", { method: "POST", body: JSON.stringify(body) });
+export const deleteAssistantMaterial = (id: string) => apiFetch<void>(`/api/assistant/materials/${id}`, { method: "DELETE" });
+
 export const createWeeklySlot = (body: WeeklySlotInput) =>
   apiFetch<{ slot: WeeklySlot; created: number; skipped: string[] }>("/api/weekly-slots", {
     method: "POST",

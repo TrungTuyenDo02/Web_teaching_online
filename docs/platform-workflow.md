@@ -110,6 +110,8 @@ Giữ mặc định trong spec cho các chức năng **mới**: OQ1 gắn nhãn 
 
 ## Test và điều kiện bắt đầu gọi AI
 
+Theo yêu cầu riêng ngày 2026-10-21, đã code/test lát **bot OpenAI chỉ đọc + RAG văn bản**: tool tìm hướng dẫn/bài giảng đúng quyền, nguồn trích dẫn, quota DB và biểu mẫu quản lý bài giảng. Đây là phần nền riêng, chưa hoàn thành M1b/M4. Tính năng tắt mặc định; bài giảng cho HS có cờ tắt riêng chờ E6/E7. Cách bật, migration 0010, dữ liệu gửi provider và giới hạn: [assistant.md](assistant.md). Chưa gọi model thật; E1/E6/E7 vẫn `not_run`.
+
 - Giữ [testing-plan.md](testing-plan.md) và test API/board/RLS/E2E đang được Claude bổ sung; eval mới ở [evals](../evals/README.md) kiểm đúng phiên bản code, không thay test dịch vụ.
 - E0 đã có phần thời gian; E1–E9 chưa có runner toàn mốc. Giữ tập dev/test tách nhau. Ngưỡng 95%, 90%, 2–5% là mục tiêu nháp cần dữ liệu, không phải cam kết.
 - Trước gọi Gemini/OpenAI: quyền dùng provider/model, ngân sách, chính sách dữ liệu/retention và secret qua cấu hình được cấp riêng; không đọc/in `.env`. Gateway không log nội dung/PII, xử lý refusal/truncation/timeout như thất bại có kiểm soát.

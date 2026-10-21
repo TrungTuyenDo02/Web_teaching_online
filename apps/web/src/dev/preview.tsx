@@ -137,6 +137,12 @@ function previewBackend(role: PreviewRole): Backend {
   }
 
   return {
+    async assistantStatus() { return { enabled: false, student_lessons: false, daily_limit: 20 }; },
+    async askAssistant() { throw new Error("Trợ lý AI chưa được bật hoặc cấu hình."); },
+    async listAssistantMaterials() { teacherOnly(); return []; },
+    async getAssistantMaterial() { throw new Error("Không tìm thấy tài liệu"); },
+    async createAssistantMaterial() { throw new Error("Chế độ xem trước không lưu tài liệu."); },
+    async deleteAssistantMaterial() { throw new Error("Chế độ xem trước không lưu tài liệu."); },
     async listTeachingTopics() { teacherOnly(); await wait(); return clone(db.topics); },
     async listWeeklySlots() { teacherOnly(); await wait(); return clone(db.slots); },
     async createWeeklySlot(body) {

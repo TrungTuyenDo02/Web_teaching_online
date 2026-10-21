@@ -418,4 +418,84 @@ do $$ begin
 end $$;
 rollback;
 
+-- 0010: tài liệu/chunk theo GV, HS không đọc trực tiếp, quota chỉ thấy của mình.
+begin;
+insert into auth.users(id) values
+ ('f1000000-0000-0000-0000-000000000001'), ('f1000000-0000-0000-0000-000000000002'),
+ ('f1000000-0000-0000-0000-000000000003'), ('f1000000-0000-0000-0000-000000000004');
+update public.profiles set role='teacher' where id in ('f1000000-0000-0000-0000-000000000001','f1000000-0000-0000-0000-000000000002');
+insert into public.students(id,teacher_id,profile_id,full_name) values
+ ('f2000000-0000-0000-0000-000000000001','f1000000-0000-0000-0000-000000000001','f1000000-0000-0000-0000-000000000003','Em RAG A'),
+ ('f2000000-0000-0000-0000-000000000002','f1000000-0000-0000-0000-000000000001','f1000000-0000-0000-0000-000000000004','Em RAG B');
+insert into public.teaching_topics(id,teacher_id,name) values
+ ('f3000000-0000-0000-0000-000000000001','f1000000-0000-0000-0000-000000000001','Phân số RAG'),
+ ('f3000000-0000-0000-0000-000000000002','f1000000-0000-0000-0000-000000000002','Riêng GV khác');
+select public.create_assistant_material('f1000000-0000-0000-0000-000000000001','f3000000-0000-0000-0000-000000000001','Phân số','Phân số biểu diễn một phần của một đơn vị.',true);
+select public.create_assistant_material('f1000000-0000-0000-0000-000000000002','f3000000-0000-0000-0000-000000000002','Riêng','Nội dung riêng chỉ giáo viên thứ hai được dùng.',false);
+do $$ begin
+ assert public.reserve_assistant_turn('f1000000-0000-0000-0000-000000000001','2026-10-21',1,2);
+ assert not public.reserve_assistant_turn('f1000000-0000-0000-0000-000000000001','2026-10-21',1,2);
+ assert public.reserve_assistant_turn('f1000000-0000-0000-0000-000000000003','2026-10-21',1,2);
+ assert not public.reserve_assistant_turn('f1000000-0000-0000-0000-000000000002','2026-10-21',1,2);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','f1000000-0000-0000-0000-000000000001',true);
+do $$ begin
+ assert (select count(*) from public.assistant_materials)=1, 'GV chỉ thấy bài giảng của mình';
+ assert (select count(*) from public.assistant_chunks)=1, 'GV chỉ thấy chunk của mình';
+ assert (select count(*) from public.assistant_daily_usage)=1, 'Chỉ thấy quota của mình';
+ assert (select count(*) from public.assistant_global_usage)=0, 'Không đọc quota toàn hệ thống';
+ begin
+   perform public.search_assistant_chunks('f1000000-0000-0000-0000-000000000002','riêng');
+   raise exception 'Trình duyệt giả principal gọi được RPC';
+ exception when insufficient_privilege then null; end;
+ begin
+   delete from public.assistant_materials;
+   raise exception 'Trình duyệt ghi kho RAG';
+ exception when insufficient_privilege then null; end;
+end $$;
+select set_config('request.jwt.claim.sub','f1000000-0000-0000-0000-000000000002',true);
+do $$ begin
+ assert (select count(*) from public.assistant_materials)=1;
+ assert (select count(*) from public.assistant_chunks)=1;
+ assert (select count(*) from public.assistant_daily_usage)=0;
+end $$;
+select set_config('request.jwt.claim.sub','f1000000-0000-0000-0000-000000000003',true);
+do $$ begin
+ assert (select count(*) from public.assistant_materials)=0, 'HS không đọc kho trực tiếp';
+ assert (select count(*) from public.assistant_chunks)=0;
+ assert (select count(*) from public.assistant_daily_usage)=1;
+ assert (select count(*) from public.assistant_global_usage)=0;
+end $$;
+reset role;
+do $$ begin
+ assert (select count(*) from public.search_assistant_chunks('f1000000-0000-0000-0000-000000000003','phân số'))=0, 'Chưa học thì chưa thấy';
+end $$;
+insert into public.sessions(id,teacher_id,student_id,scheduled_start,scheduled_end,status) values
+ ('f4000000-0000-0000-0000-000000000001','f1000000-0000-0000-0000-000000000001','f2000000-0000-0000-0000-000000000001',now(),now()+interval '1 hour','completed');
+insert into public.session_topics(session_id,topic_id) values ('f4000000-0000-0000-0000-000000000001','f3000000-0000-0000-0000-000000000001');
+set local role service_role;
+do $$ begin
+ assert (select count(*) from public.search_assistant_chunks('f1000000-0000-0000-0000-000000000003','phân số'))=1, 'HS thấy đúng chủ đề đã học';
+ assert (select count(*) from public.search_assistant_chunks('f1000000-0000-0000-0000-000000000004','phân số'))=0, 'HS khác không thấy';
+end $$;
+reset role;
+update public.students set deleting_at=now() where id='f2000000-0000-0000-0000-000000000001';
+do $$ begin
+ assert (select count(*) from public.search_assistant_chunks('f1000000-0000-0000-0000-000000000003','phân số'))=0, 'Đang xóa thì không RAG';
+end $$;
+delete from public.assistant_daily_usage;
+do $$ begin
+ assert not public.reserve_assistant_turn('f1000000-0000-0000-0000-000000000002','2026-10-21',1,2), 'Dọn actor không hoàn lại ngân sách';
+end $$;
+set local role anon;
+do $$ begin
+ begin
+   perform 1 from public.assistant_materials;
+   raise exception 'Khách đọc được tài liệu';
+ exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+rollback;
+
 select 'RLS OK' as ket_qua;

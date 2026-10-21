@@ -39,6 +39,12 @@ export interface StudentOption {
 export type EndResult = Awaited<ReturnType<typeof api.endSession>>;
 
 export interface Backend {
+  assistantStatus: typeof api.assistantStatus;
+  askAssistant: typeof api.askAssistant;
+  listAssistantMaterials: typeof api.listAssistantMaterials;
+  getAssistantMaterial: typeof api.getAssistantMaterial;
+  createAssistantMaterial: typeof api.createAssistantMaterial;
+  deleteAssistantMaterial: typeof api.deleteAssistantMaterial;
   listUpcoming(): Promise<SessionItem[]>;
   listHistory(): Promise<PastSession[]>;
   listStudentOptions(): Promise<StudentOption[]>;
@@ -80,6 +86,12 @@ function client() {
 }
 
 const supabaseBackend: Backend = {
+  assistantStatus: api.assistantStatus,
+  askAssistant: api.askAssistant,
+  listAssistantMaterials: api.listAssistantMaterials,
+  getAssistantMaterial: api.getAssistantMaterial,
+  createAssistantMaterial: api.createAssistantMaterial,
+  deleteAssistantMaterial: api.deleteAssistantMaterial,
   async listUpcoming() {
     // RLS tự lọc: giáo viên thấy buổi của mình, học sinh chỉ thấy buổi của em
     const { data, error } = await client()

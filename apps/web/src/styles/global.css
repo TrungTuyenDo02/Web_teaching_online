@@ -6,6 +6,7 @@
  */
 
 /* ---------- Nền & chữ ---------- */
+.material-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {
