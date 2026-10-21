@@ -42,7 +42,7 @@ export function Field({ label, hint, error, required, children }: Props) {
         </p>
       )}
       {error && (
-        <p className="field__error" id={errorId}>
+        <p className="field__error" id={errorId} role="alert">
           {error}
         </p>
       )}

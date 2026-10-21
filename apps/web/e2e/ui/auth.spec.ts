@@ -22,10 +22,13 @@ for (const path of PRIVATE_PATHS) {
 test("AUTH-01 sai mật khẩu báo lỗi tiếng Việt, không vào được @smoke", async ({ page, fake, allowConsole }) => {
   allowConsole(/status of 400/); // trình duyệt luôn log phản hồi 400 của Supabase Auth
   await page.goto("/login");
+  await expect(page).toHaveTitle(/^Đăng nhập · /);
+  await expect(page.getByRole("heading", { level: 1, name: "Đăng nhập" })).toBeVisible();
   await page.getByLabel("Email").fill(TEACHER.email);
   await page.getByLabel("Mật khẩu").fill("sai-mat-khau");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
   await expect(page.getByText("Email hoặc mật khẩu chưa đúng.")).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeFocused(); // nút khóa lúc gửi làm mất focus: trả về ô đầu
   await expect(page).toHaveURL(/\/login$/);
   expect(fake.calls.some((c) => c.startsWith("POST /auth/v1/token"))).toBe(true);
 });

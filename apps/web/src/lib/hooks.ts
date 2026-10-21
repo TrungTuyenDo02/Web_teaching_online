@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { brand } from "../brand";
 import { errorMessage } from "./data";
 
 export interface AsyncState<T> {
@@ -7,6 +8,16 @@ export interface AsyncState<T> {
   loading: boolean;
   /** Tải lại (sau thao tác ghi); giữ dữ liệu cũ trên màn hình trong lúc tải */
   reload: () => Promise<void>;
+}
+
+/** Tiêu đề tab nói rõ trang (WCAG 2.4.2); trả lại tên chung khi rời trang. `title` đã qua t() nên theo ngôn ngữ. */
+export function usePageTitle(title?: string) {
+  useEffect(() => {
+    document.title = title ? `${title} · ${brand.name}` : brand.name;
+    return () => {
+      document.title = brand.name;
+    };
+  }, [title]);
 }
 
 /** Tải dữ liệu khi mở trang; lỗi được đổi thành câu tiếng Việt để hiện ErrorState. */

@@ -167,7 +167,7 @@ Nút `✕` hover: nền `--danger`. Nút `_` / `▢` chỉ trang trí nếu chư
 - Disabled: nền `--lavender-100`, chữ `--ink-500`, không bóng.
 
 ### 5.3 Input / Form (kiểu "LOGIN")
-- Input nền trắng, viền `--border`, bo `--radius-sm`, focus: viền `--periwinkle-400` + outline 3px `--lavender-300`.
+- Input nền trắng, viền `--border`, bo `--radius-sm`, focus: outline 3px `--ink-900`, lệch ra 2px (giữ viền tối).
 - Label dùng font pixel cỡ nhỏ, in hoa.
 - Form đăng nhập đặt trong `Window` variant peach hoặc pink.
 
@@ -234,7 +234,7 @@ Tạo component `Decor` nhận `type`: `sparkle | star4 | cloud | moon | starbur
 ## 9. Accessibility (không thương lượng)
 
 - Tương phản chữ/nền ≥ 4.5:1 (chữ `--ink-900` trên nền sáng đã đạt).
-- Mọi tương tác dùng được bằng bàn phím; focus ring rõ ràng (3px `--lavender-300` + viền `--periwinkle-400`).
+- Mọi tương tác dùng được bằng bàn phím; focus ring rõ ràng: outline 3px `--ink-900` lệch 2px, trên nền tối đổi sang `--bg-window` (pastel nhạt không đạt 3:1).
 - Nút điều khiển window có `aria-label` ("Đóng", "Thu nhỏ", "Phóng to").
 - Decor: `aria-hidden`. Ảnh nội dung có `alt`.
 - Touch target ≥ 40×40px trên mobile.

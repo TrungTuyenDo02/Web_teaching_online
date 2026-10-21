@@ -10,7 +10,7 @@ interface Props {
   variant?: WindowVariant;
   /** Nút thật trên title bar (mỗi nút ≥ 44px); không có nút đóng/thu nhỏ giả */
   actions?: ReactNode;
-  headingLevel?: 2 | 3;
+  headingLevel?: 1 | 2 | 3;
   /** Thân không có padding (bảng, danh sách sát mép) */
   flush?: boolean;
   className?: string;
@@ -35,7 +35,7 @@ export function Window({
 }: Props) {
   const ownTitleId = useId();
   const titleId = givenTitleId ?? ownTitleId;
-  const Heading = headingLevel === 2 ? "h2" : "h3";
+  const Heading = `h${headingLevel}` as const;
   const classes = ["window", `window--${variant}`, flush && "window--flush", className].filter(Boolean);
   return (
     <section className={classes.join(" ")} aria-labelledby={titleId} id={id}>

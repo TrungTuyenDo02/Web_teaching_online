@@ -1,6 +1,7 @@
 import { setLang, t, useLang, type Lang } from "../lib/i18n";
 
-// Tên ngôn ngữ viết bằng chính ngôn ngữ đó (không dịch), để ai cũng tìm được ngôn ngữ của mình
+// Tên ngôn ngữ viết bằng chính ngôn ngữ đó (không dịch), để ai cũng tìm được ngôn ngữ của mình.
+// Tên đọc bắt đầu bằng chữ đang hiện (VI/EN) để lệnh giọng nói "bấm VI" vẫn khớp (WCAG 2.5.3)
 const OPTIONS: [Lang, string, string][] = [
   ["vi", "VI", "Tiếng Việt"],
   ["en", "EN", "English"],
@@ -12,7 +13,7 @@ export function LangSwitch() {
   return (
     <div className="segmented lang-switch" role="group" aria-label={t("Ngôn ngữ")}>
       {OPTIONS.map(([code, short, name]) => (
-        <button key={code} type="button" lang={code} aria-pressed={current === code} aria-label={name} onClick={() => setLang(code)}>
+        <button key={code} type="button" lang={code} aria-pressed={current === code} aria-label={`${short} – ${name}`} onClick={() => setLang(code)}>
           {short}
         </button>
       ))}

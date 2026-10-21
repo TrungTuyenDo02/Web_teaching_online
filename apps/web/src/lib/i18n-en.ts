@@ -162,6 +162,7 @@ export const en: Record<string, string> = {
   "Đang học ({n})": "Active ({n})",
   "Ngừng dạy ({n})": "Paused ({n})",
   "Tất cả ({n})": "All ({n})",
+  "Đang hiện {n} học sinh": "Showing {n} students",
   "Đang tải danh sách học sinh…": "Loading students…",
   "Chưa có học sinh nào.": "No students yet.",
   "Không có học sinh khớp bộ lọc.": "No students match this filter.",

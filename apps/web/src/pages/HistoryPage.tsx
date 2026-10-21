@@ -17,7 +17,7 @@ export default function HistoryPage() {
   const history = useAsync(() => backend.listHistory(), "Không tải được buổi đã học.");
 
   return (
-    <AppShell>
+    <AppShell title={t("Buổi đã học")}>
       <div className="page__head">
         <div>
           <h1>{t("Buổi đã học")}</h1>
@@ -37,7 +37,7 @@ export default function HistoryPage() {
             {history.data?.map((item) => (
               <li key={item.id} className="item">
                 <div className="item__top">
-                  <span className="item__title">{sessionTitle(item)}</span>
+                  <span className="item__title" id={`past-${item.id}`}>{sessionTitle(item)}</span>
                   <span className="muted">{formatDateTime(item.scheduled_start, now)}</span>
                 </div>
                 {teacher && <div className="item__meta">{t("Học sinh: {name}", { name: item.student_name || "—" })}</div>}
@@ -55,7 +55,7 @@ export default function HistoryPage() {
                 )}
                 <div className="btn-row">
                   {item.board_snapshot_path ? (
-                    <ButtonLink size="sm" to={`/history/${item.id}/board`}>
+                    <ButtonLink size="sm" to={`/history/${item.id}/board`} aria-describedby={`past-${item.id}`}>
                       {t("Xem lại bảng")}
                     </ButtonLink>
                   ) : (

@@ -81,7 +81,6 @@
 
   /* --- Mở rộng: tương tác & bố cục --- */
   --touch: 44px;                          /* vùng chạm tối thiểu (AGENTS.md), ưu tiên hơn DESIGN.md */
-  --focus-ring: 0 0 0 3px var(--lavender-300);
   --content-max: 1120px;
   --gutter: var(--sp-4);
   --z-header: 10;

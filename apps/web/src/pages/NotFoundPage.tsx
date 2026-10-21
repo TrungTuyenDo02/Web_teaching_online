@@ -1,12 +1,14 @@
 import { ButtonLink } from "../ui/Button";
 import { Window } from "../ui/Window";
+import { usePageTitle } from "../lib/hooks";
 import { t } from "../lib/i18n";
 
 /** Trang lỗi 404 kiểu cửa sổ ERROR (DESIGN.md 5.7): thân thiện, không đổ lỗi người dùng. */
 export default function NotFoundPage() {
+  usePageTitle(t("Không tìm thấy trang"));
   return (
     <main className="centered">
-      <Window title={t("Không tìm thấy trang")} file="error.exe" variant="danger">
+      <Window title={t("Không tìm thấy trang")} file="error.exe" variant="danger" headingLevel={1}>
         <p>{t("Ôi, trang này không có ở đây. Có thể đường dẫn đã cũ hoặc bị gõ nhầm.")}</p>
         <div className="btn-row">
           <ButtonLink variant="primary" to="/">

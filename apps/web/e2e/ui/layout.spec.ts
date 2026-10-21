@@ -90,6 +90,36 @@ test("UI-01 trang đăng nhập ở điện thoại 360: không tràn, ô và n�
   }
 });
 
+test("UI-01 ô nhập nhận viền focus đậm khi Tab tới (WCAG 2.4.7)", async ({ page, openPreview }) => {
+  await openPreview(page, "teacher", "/reports");
+  const month = page.getByLabel("Tháng báo cáo");
+  for (let i = 0; i < 30 && !(await month.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+  await expect(month).toBeFocused();
+  expect(await month.evaluate((el) => { const cs = getComputedStyle(el); return `${cs.outlineStyle} ${cs.outlineColor}`; })).toBe("solid rgb(42, 39, 96)");
+});
+
+test("UI-02 trình đọc màn hình: tiêu đề tab theo trang, focus về nội dung khi chuyển trang, lỗi trường và số dòng được báo @smoke", async ({ page, openPreview }) => {
+  await openPreview(page, "teacher", "/students");
+  await expect(page).toHaveTitle(/^Học sinh · /);
+  // Tìm/lọc: báo gọn số dòng, không đọc lại cả danh sách
+  await expect(page.locator(".items[aria-live]")).toHaveCount(0);
+  await page.getByLabel("Tìm theo tên hoặc lớp").fill("Lan Anh");
+  await expect(page.getByRole("status").filter({ hasText: "Đang hiện 1 học sinh" })).toBeAttached();
+  // Lỗi tại trường là alert: được đọc ngay khi bấm lưu
+  await page.getByRole("button", { name: "Thêm học sinh" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Thêm học sinh" });
+  await dialog.getByRole("button", { name: "Thêm học sinh" }).click();
+  await expect(dialog.getByRole("alert").filter({ hasText: "Hãy nhập họ tên học sinh." })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Buổi đã học" }).click();
+  await expect(page).toHaveTitle(/^Buổi đã học · /);
+  await expect(page.locator("#main")).toBeFocused();
+  await page.goto("/khong-co-trang");
+  await expect(page).toHaveTitle(/^Không tìm thấy trang · /);
+  await expect(page.getByRole("heading", { level: 1, name: "Không tìm thấy trang" })).toBeVisible();
+});
+
 test("UI-02 hộp thoại bằng bàn phím: mở bằng Enter, focus ở trong, Tab không thoát, Esc đóng và trả focus @smoke", async ({ page, openPreview }) => {
   await openPreview(page, "teacher", "/students");
   const opener = page.getByRole("button", { name: "Thêm học sinh" }).first();

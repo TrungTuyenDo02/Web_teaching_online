@@ -35,7 +35,7 @@ export default function StudentsPage() {
   const { user } = useAuth();
   if (user?.role !== "teacher") return <Navigate to="/" replace />;
   return (
-    <AppShell>
+    <AppShell title={t("Học sinh")}>
       <StudentsManager />
     </AppShell>
   );
@@ -142,6 +142,10 @@ function StudentsManager() {
           </div>
         </div>
 
+        {/* Báo gọn số dòng khi tìm/lọc thay vì đọc lại cả danh sách */}
+        <p className="sr-only" role="status">
+          {list.data ? t("Đang hiện {n} học sinh", { n: visible.length }) : ""}
+        </p>
         {list.error && <ErrorState message={list.error} onRetry={() => void list.reload()} />}
         {list.loading && !list.data ? (
           <Loading label={t("Đang tải danh sách học sinh…")} />
@@ -154,11 +158,11 @@ function StudentsManager() {
             )}
           </Empty>
         ) : (
-          <ul className="items" aria-live="polite">
+          <ul className="items">
             {visible.map((s) => (
               <li key={s.id} className="item">
                 <div className="item__top">
-                  <span className="item__title">
+                  <span className="item__title" id={`student-${s.id}`}>
                     {s.full_name}
                     {s.grade ? ` · ${t("Lớp {grade}", { grade: s.grade })}` : ""}
                   </span>
@@ -198,36 +202,36 @@ function StudentsManager() {
                 ) : (
                   <>
                     <div className="btn-row">
-                      <Button size="sm" onClick={() => setEditing({ student: s })}>
+                      <Button size="sm" onClick={() => setEditing({ student: s })} aria-describedby={`student-${s.id}`}>
                         {t("Sửa hồ sơ")}
                       </Button>
                       {s.active && (
-                        <Button size="sm" onClick={() => setSlotsFor(s)}>
+                        <Button size="sm" onClick={() => setSlotsFor(s)} aria-describedby={`student-${s.id}`}>
                           {t("Lịch hằng tuần")}
                         </Button>
                       )}
                       {s.profile_id ? (
-                        <Button size="sm" onClick={() => setAccount({ student: s, reset: true })}>
+                        <Button size="sm" onClick={() => setAccount({ student: s, reset: true })} aria-describedby={`student-${s.id}`}>
                           {t("Đặt lại mật khẩu")}
                         </Button>
                       ) : (
                         s.active && (
-                          <Button size="sm" onClick={() => setAccount({ student: s, reset: false })}>
+                          <Button size="sm" onClick={() => setAccount({ student: s, reset: false })} aria-describedby={`student-${s.id}`}>
                             {t("Tạo tài khoản")}
                           </Button>
                         )
                       )}
                     </div>
                     <details className="more">
-                      <summary>{t("Thao tác khác")}</summary>
+                      <summary aria-describedby={`student-${s.id}`}>{t("Thao tác khác")}</summary>
                       <div className="btn-row">
-                        <Button size="sm" busy={rowBusy === s.id} onClick={() => void toggleActive(s)}>
+                        <Button size="sm" busy={rowBusy === s.id} onClick={() => void toggleActive(s)} aria-describedby={`student-${s.id}`}>
                           {s.active ? t("Ngừng dạy") : t("Dạy lại")}
                         </Button>
                         {s.active ? (
                           <span className="muted">{t("Muốn xóa hẳn, hãy chuyển sang ngừng dạy trước.")}</span>
                         ) : (
-                          <Button size="sm" variant="danger" onClick={() => setDeleting(s)}>
+                          <Button size="sm" variant="danger" onClick={() => setDeleting(s)} aria-describedby={`student-${s.id}`}>
                             {t("Xóa hẳn…")}
                           </Button>
                         )}

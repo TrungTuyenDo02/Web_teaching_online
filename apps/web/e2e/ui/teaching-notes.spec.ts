@@ -56,7 +56,7 @@ test("NOTE-02 học sinh không tải dữ liệu ghi chú riêng @smoke", async
 test("NOTE-04 ghi chú theo ngôn ngữ đã chọn, tháng vẫn theo Việt Nam @smoke", async ({ page, openPreview }) => {
   await page.clock.setFixedTime(new Date("2026-09-30T18:00:00Z"));
   await openPreview(page, "teacher", "/teaching-notes");
-  await page.getByRole("button", { name: "English", exact: true }).click();
+  await page.getByRole("button", { name: "EN – English", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Private notes", exact: true })).toBeVisible();
   await expect(page.getByLabel("Notes month")).toHaveValue("2026-10");
   await page.getByLabel("Student for notes").selectOption("s1");
@@ -66,7 +66,7 @@ test("NOTE-04 ghi chú theo ngôn ngữ đã chọn, tháng vẫn theo Việt Na
   await expect(dialog.getByLabel("Private assessment")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Save notes", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("button", { name: "Tiếng Việt", exact: true }).click();
+  await page.getByRole("button", { name: "VI – Tiếng Việt", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Ghi chú riêng", exact: true })).toBeVisible();
 });
 

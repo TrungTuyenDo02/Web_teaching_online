@@ -109,7 +109,7 @@ function Guide({ role }: { role: Role }) {
                   <p className="helper__bubble helper__bubble--user"><span className="sr-only">{t("Bạn:")} </span>{item.question}</p>
                   <div className="helper__bubble">
                     <p>{item.answer.text}</p>
-                    {item.answer.links.map((link) => <Link key={link.to} to={link.to} className="btn btn--sm helper__link" onClick={close}>{link.label} →</Link>)}
+                    {item.answer.links.map((link) => <Link key={link.to} to={link.to} className="btn btn--sm helper__link" onClick={close}>{link.label} <span aria-hidden="true">→</span></Link>)}
                   </div>
                 </div>
               ))}

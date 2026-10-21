@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, type ReactNode } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { brand } from "../brand";
 import HelperBot from "../components/HelperBot";
+import { usePageTitle } from "../lib/hooks";
 import { t } from "../lib/i18n";
 import { Button } from "./Button";
 import { DecorLayer } from "./Decor";
@@ -22,9 +23,19 @@ const NAV = {
   ],
 } as const;
 
+// Mỗi trang dựng AppShell riêng nên nhớ đường dẫn ở cấp module để biết là vừa chuyển trang
+let lastPath: string | null = null;
+
 /** Khung trang: thanh trên (taskbar) gồm tên ứng dụng, điều hướng theo vai trò, ngôn ngữ, tài khoản, đăng xuất. */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ title, children }: { title?: string; children: ReactNode }) {
   const { user, signOut } = useAuth();
+  const { pathname } = useLocation();
+  usePageTitle(title);
+  // Chuyển trang trong ứng dụng: đưa focus về nội dung chính để trình đọc màn hình đọc trang mới (lần mở đầu thì không)
+  useEffect(() => {
+    if (lastPath !== null && lastPath !== pathname) document.getElementById("main")?.focus();
+    lastPath = pathname;
+  }, [pathname]);
   const links = user?.role === "teacher" ? NAV.teacher : NAV.student;
   return (
     <div className="shell">

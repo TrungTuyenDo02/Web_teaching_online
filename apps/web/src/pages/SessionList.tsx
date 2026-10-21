@@ -24,7 +24,7 @@ export function SessionList({ items, now, teacher, onEdit, onCancel }: Props) {
       {items.map((item) => (
         <li key={item.id} className="item">
           <div className="item__top">
-            <span className="item__title">{sessionTitle(item)}</span>
+            <span className="item__title" id={`session-${item.id}`}>{sessionTitle(item)}</span>
             <SessionStatus status={item.status} />
           </div>
           <div className="item__meta">
@@ -35,20 +35,20 @@ export function SessionList({ items, now, teacher, onEdit, onCancel }: Props) {
             <span>{t("{n} phút", { n: durationMinutes(item) })}</span>
           </div>
           <div className="btn-row">
-            <ButtonLink variant="primary" size="sm" to={`/room/${item.id}?mode=main`}>
+            <ButtonLink variant="primary" size="sm" to={`/room/${item.id}?mode=main`} aria-describedby={`session-${item.id}`}>
               {t("Vào lớp")}
             </ButtonLink>
             {teacher && (
-              <ButtonLink size="sm" to={`/room/${item.id}?mode=board`}>
+              <ButtonLink size="sm" to={`/room/${item.id}?mode=board`} aria-describedby={`session-${item.id}`}>
                 {t("Bảng trên tablet")}
               </ButtonLink>
             )}
             {teacher && item.status === "scheduled" && (
               <>
-                <Button size="sm" variant="ghost" onClick={() => onEdit?.(item)}>
+                <Button size="sm" variant="ghost" onClick={() => onEdit?.(item)} aria-describedby={`session-${item.id}`}>
                   {t("Sửa")}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => onCancel?.(item)}>
+                <Button size="sm" variant="ghost" onClick={() => onCancel?.(item)} aria-describedby={`session-${item.id}`}>
                   {t("Hủy buổi")}
                 </Button>
               </>

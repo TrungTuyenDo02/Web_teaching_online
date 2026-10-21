@@ -131,10 +131,10 @@ function NotesForMonth({ studentId, studentName, month }: { studentId: string; s
       {!records.length ? <Empty title={t("Chưa có buổi đã kết thúc trong tháng này.")} /> : (
         <ul className="items">{records.map((record) => (
           <li key={record.session_id} className="item">
-            <div className="item__top"><strong>{record.subject || t("Buổi học")}{record.scheduled_topic && ` · ${record.scheduled_topic}`}</strong><span>{vnDate(record.scheduled_start)}</span></div>
+            <div className="item__top"><strong id={`note-${record.session_id}`}>{record.subject || t("Buổi học")}{record.scheduled_topic && ` · ${record.scheduled_topic}`}</strong><span>{vnDate(record.scheduled_start)}</span></div>
             <p className="note-text">{record.summary_md || t("Chưa ghi nhận xét riêng.")}</p>
             <p className="muted">{t("Chủ đề đã dạy: {topics}", { topics: record.topic_ids.map((id) => topics.find((topic) => topic.id === id)?.name || t("Chủ đề không còn trong danh mục")).join("; ") || t("Chưa chọn") })}</p>
-            <Button onClick={() => setEditing(record)}>{t("Ghi chú riêng")}</Button>
+            <Button onClick={() => setEditing(record)} aria-describedby={`note-${record.session_id}`}>{t("Ghi chú riêng")}</Button>
           </li>
         ))}</ul>
       )}
@@ -164,5 +164,5 @@ function TeacherNotes() {
 
 export default function TeachingNotesPage() {
   const { user } = useAuth();
-  return <AppShell>{user?.role === "teacher" ? <TeacherNotes /> : <Alert>{t("Chỉ giáo viên được xem ghi chú riêng.")}</Alert>}</AppShell>;
+  return <AppShell title={t("Ghi chú riêng")}>{user?.role === "teacher" ? <TeacherNotes /> : <Alert>{t("Chỉ giáo viên được xem ghi chú riêng.")}</Alert>}</AppShell>;
 }

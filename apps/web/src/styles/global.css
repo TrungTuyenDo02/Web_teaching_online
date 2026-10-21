@@ -31,7 +31,8 @@ h3 { font-size: var(--text-md); }
 p { margin: 0; }
 a { color: var(--ink-700); }
 code { font-family: var(--font-mono); background: var(--lavender-100); padding: 0 var(--sp-1); border-radius: var(--radius-sm); }
-:focus-visible { outline: 3px solid var(--periwinkle-400); outline-offset: 2px; }
+/* Viền focus màu đậm (12,9:1 trên nền giấy); periwinkle/lavender cũ chỉ 1,4–2,3:1, dưới mức 3:1 của WCAG 1.4.11 */
+:focus-visible { outline: 3px solid var(--ink-900); outline-offset: 2px; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -40,6 +41,8 @@ code { font-family: var(--font-mono); background: var(--lavender-100); padding: 
   position: absolute; left: var(--sp-2); top: -100px; z-index: var(--z-toast);
 }
 .skip-link:focus { top: var(--sp-2); }
+/* Vùng nội dung nhận focus khi chuyển trang hoặc qua link bỏ qua: không phải điều khiển, không vẽ viền */
+#main:focus { outline: none; }
 
 /* ---------- Khung trang (AppShell) ---------- */
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -79,6 +82,14 @@ code { font-family: var(--font-mono); background: var(--lavender-100); padding: 
   /* Điện thoại: thanh trên không dính để không chiếm chiều cao; mục điều hướng trượt ngang */
   .taskbar { position: static; }
   .taskbar__nav { order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; }
+  /* Bóng mờ ở mép khi còn mục bị khuất (lớp "local" che bóng khi đã cuộn tới đầu/cuối) */
+  .taskbar__nav {
+    background:
+      linear-gradient(to right, var(--bg-window) 30%, transparent) left / 40px 100% no-repeat local,
+      linear-gradient(to left, var(--bg-window) 30%, transparent) right / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, var(--overlay), transparent) left / 14px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, var(--overlay), transparent) right / 14px 100% no-repeat scroll;
+  }
   .taskbar__link { flex: none; padding: 0 var(--sp-2); }
   .taskbar__role { display: none; }
   .page { padding-top: var(--sp-4); gap: var(--sp-4); }
@@ -102,7 +113,7 @@ code { font-family: var(--font-mono); background: var(--lavender-100); padding: 
   border-bottom: var(--border);
 }
 .window__title { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
-.window__title h2, .window__title h3 { font-size: var(--text-md); font-weight: 800; }
+.window__title h1, .window__title h2, .window__title h3 { font-size: var(--text-md); font-weight: 800; }
 .window__file { font-family: var(--font-pixel); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--ink-900); opacity: 0.85; }
 .window__actions { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
 /* Chấm trang trí trên title bar: không phải nút, không nhận focus */
@@ -134,7 +145,6 @@ code { font-family: var(--font-mono); background: var(--lavender-100); padding: 
 }
 .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink-900); }
 .btn:active { transform: translate(3px, 3px); box-shadow: var(--shadow-none); }
-.btn:focus-visible { outline: none; box-shadow: var(--shadow-hard-sm), var(--focus-ring); border-color: var(--ink-900); }
 .btn--primary { background: var(--periwinkle-400); }
 .btn--accent { background: var(--mint-400); }
 .btn--danger { background: var(--danger-100); color: var(--danger-ink); border-color: var(--danger-ink); box-shadow: 3px 3px 0 var(--danger-ink); }
@@ -167,7 +177,6 @@ code { font-family: var(--font-mono); background: var(--lavender-100); padding: 
   border: var(--border); border-radius: var(--radius-sm);
 }
 textarea.input { min-height: 88px; resize: vertical; }
-.input:focus { outline: none; border-color: var(--periwinkle-400); box-shadow: var(--focus-ring); }
 .input[aria-invalid="true"] { border-color: var(--danger-ink); background: var(--danger-100); }
 .check { display: flex; align-items: center; gap: var(--sp-3); min-height: var(--touch); cursor: pointer; }
 .check input { width: 24px; height: 24px; margin: 0; accent-color: var(--lilac-700); flex: none; }
@@ -265,7 +274,7 @@ textarea.input { min-height: 88px; resize: vertical; }
 }
 .segmented button:last-child { border-right: 0; }
 .segmented button[aria-pressed="true"] { background: var(--lavender-300); }
-.segmented button:focus-visible { outline: 3px solid var(--periwinkle-400); outline-offset: -3px; }
+.segmented button:focus-visible { outline-offset: -6px; } /* vẽ vào trong, tách khỏi viền nhóm */
 .toolbar { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: flex-end; }
 .toolbar .field { flex: 1 1 220px; }
 
@@ -275,7 +284,6 @@ textarea.input { min-height: 88px; resize: vertical; }
   display: inline-flex; align-items: center; min-height: var(--touch); padding: 0 var(--sp-2);
   cursor: pointer; font-weight: 700; color: var(--ink-700); border-radius: var(--radius-sm);
 }
-.more summary:focus-visible { outline: 3px solid var(--periwinkle-400); }
 .more[open] summary { margin-bottom: var(--sp-2); }
 
 /* ---------- Phòng học ---------- */
@@ -293,6 +301,7 @@ textarea.input { min-height: 88px; resize: vertical; }
 }
 /* Màn hình hẹp: video là dải phụ dưới bảng */
 .room__video { min-height: 0; height: 200px; border: var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--ink-900); }
+.room__video :focus-visible { outline-color: var(--bg-window); } /* nền tối: viền focus sáng */
 @media (min-width: 1024px) { .room--main .room__video { height: auto; } }
 .room--board { padding: var(--sp-1); gap: var(--sp-1); }
 .room--board .room__body { grid-template-rows: minmax(0, 1fr); }

@@ -55,9 +55,9 @@ function MonthResult({ month }: { month: string }) {
 export default function MonthlyReportPage() {
   const { user } = useAuth();
   const [month, setMonth] = useState(currentMonth);
-  if (user?.role !== "teacher") return <AppShell><Alert>{t("Chỉ giáo viên được xem báo cáo.")}</Alert></AppShell>;
+  if (user?.role !== "teacher") return <AppShell title={t("Báo cáo tháng")}><Alert>{t("Chỉ giáo viên được xem báo cáo.")}</Alert></AppShell>;
   return (
-    <AppShell>
+    <AppShell title={t("Báo cáo tháng")}>
       <div className="page__head">
         <div><h1>{t("Báo cáo tháng")}</h1><p className="page__lead">{t("Số buổi đã kết thúc của từng học sinh.")}</p></div>
       </div>

@@ -51,7 +51,7 @@ function Manage() {
     finally { setBusy(false); }
   }
   return <>
-    <div className="page-heading"><div><h1>{t("Bài giảng cho trợ lý AI")}</h1><p className="muted">{t("Nhập văn bản đã kiểm tra và gắn chủ đề. Bản đầu chưa đọc PDF hoặc ảnh.")}</p></div>
+    <div className="page__head"><div><h1>{t("Bài giảng cho trợ lý AI")}</h1><p className="muted">{t("Nhập văn bản đã kiểm tra và gắn chủ đề. Bản đầu chưa đọc PDF hoặc ảnh.")}</p></div>
       <Button onClick={() => { setEditor(true); setError(null); }} disabled={!topics.data?.length}>{t("Thêm bài giảng")}</Button></div>
     <Alert tone="info">{t("Không nhập lời giải tham chiếu, ghi chú riêng hay thông tin cá nhân học sinh. Khi bật AI, trích đoạn phù hợp có thể được gửi OpenAI.")}</Alert>
     {topics.error && <ErrorState message={topics.error} onRetry={() => void topics.reload()} />}
@@ -59,9 +59,9 @@ function Manage() {
     {materials.error ? <ErrorState message={materials.error} onRetry={() => void materials.reload()} /> : materials.loading ? <Loading /> :
       <Window title={t("Kho bài giảng")} file="rag.txt">
         {!materials.data?.length ? <Empty title={t("Chưa có bài giảng")} /> : <div className="stack">{materials.data.map((row) => <article key={row.id} className="item">
-          <h3>{row.title}</h3><p className="material-text">{row.content.slice(0, 240)}</p>
+          <h3 id={`material-${row.id}`}>{row.title}</h3><p className="material-text">{row.content.slice(0, 240)}</p>
           <p className="muted">{row.student_visible ? t("Đã cho phép dùng với học sinh đã học chủ đề này") : t("Chỉ giáo viên dùng với AI")}</p>
-          <div className="btn-row"><a className="btn btn--sm" href={`/assistant-materials/${row.id}`}>{t("Xem tài liệu")}</a><Button size="sm" onClick={() => { setDeleting(row); setError(null); }}>{t("Gỡ bài giảng")}</Button></div>
+          <div className="btn-row"><a className="btn btn--sm" href={`/assistant-materials/${row.id}`} aria-describedby={`material-${row.id}`}>{t("Xem tài liệu")}</a><Button size="sm" aria-describedby={`material-${row.id}`} onClick={() => { setDeleting(row); setError(null); }}>{t("Gỡ bài giảng")}</Button></div>
         </article>)}</div>}
       </Window>}
     <Dialog open={editor} title={t("Thêm bài giảng")} onClose={() => setEditor(false)} busy={busy}>
@@ -69,9 +69,9 @@ function Manage() {
         <Field label={t("Tiêu đề bài giảng")}>{(c) => <input {...c} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={160} />}</Field>
         <Field label={t("Chủ đề bài giảng")}>{(c) => <select {...c} value={topic} onChange={(e) => setTopic(e.target.value)} required><option value="">{t("Chọn chủ đề")}</option>{topics.data?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}</Field>
         <Field label={t("Nội dung bài giảng")}>{(c) => <textarea {...c} rows={10} value={content} onChange={(e) => setContent(e.target.value)} required minLength={20} maxLength={24000} />}</Field>
-        <label className="check-row"><input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} />{t("Cho phép dùng với học sinh đã học chủ đề này")}</label>
+        <label className="check"><input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} />{t("Cho phép dùng với học sinh đã học chủ đề này")}</label>
         <p className="muted">{t("Quyền này chỉ có hiệu lực sau khi tính năng bài giảng cho học sinh được nghiệm thu và bật trên API.")}</p>
-        <label className="check-row"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} required />{t("Tôi đã kiểm tra: đây là bài giảng, không có lời giải tham chiếu hoặc dữ liệu cá nhân.")}</label>
+        <label className="check"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} required />{t("Tôi đã kiểm tra: đây là bài giảng, không có lời giải tham chiếu hoặc dữ liệu cá nhân.")}</label>
         {error && <Alert tone="error">{error}</Alert>}<Button type="submit" busy={busy} disabled={!confirmed}>{t("Lưu bài giảng")}</Button>
       </form>
     </Dialog>
@@ -84,5 +84,5 @@ function Manage() {
 export default function AssistantMaterialsPage() {
   const { user } = useAuth();
   const { materialId } = useParams();
-  return <AppShell>{materialId ? <Source key={materialId} id={materialId} /> : user?.role === "teacher" ? <Manage /> : <Alert tone="error">{t("Chỉ giáo viên được quản lý tài liệu")}</Alert>}</AppShell>;
+  return <AppShell title={t("Bài giảng cho trợ lý AI")}>{materialId ? <Source key={materialId} id={materialId} /> : user?.role === "teacher" ? <Manage /> : <Alert tone="error">{t("Chỉ giáo viên được quản lý tài liệu")}</Alert>}</AppShell>;
 }

@@ -6,6 +6,7 @@ import { Dialog } from "../ui/Dialog";
 import { Field } from "../ui/Field";
 import { Alert, Loading } from "../ui/Feedback";
 import { Window } from "../ui/Window";
+import { usePageTitle } from "../lib/hooks";
 import { t } from "../lib/i18n";
 
 // Tách gói để trang danh sách tải nhanh; Excalidraw và LiveKit chỉ tải khi vào phòng
@@ -23,6 +24,7 @@ export default function RoomPage() {
   const [params] = useSearchParams();
   const mode: DeviceMode = params.get("mode") === "board" ? "board" : "main";
   const navigate = useNavigate();
+  usePageTitle(mode === "board" ? t("Bảng viết (tablet)") : t("Phòng học"));
 
   const [state, setState] = useState<State>({ status: "loading" });
   const [endOpen, setEndOpen] = useState(false);
@@ -78,7 +80,7 @@ export default function RoomPage() {
   if (endPending) {
     return (
       <main className="centered">
-        <Window title={t("Buổi học đã kết thúc")} file="saving.exe" variant="peach">
+        <Window title={t("Buổi học đã kết thúc")} file="saving.exe" variant="peach" headingLevel={1}>
           <Alert tone="warning">
             {t("Buổi học đã được tính. Chưa đóng xong phòng video hoặc chưa lưu được bảng; hệ thống sẽ tự thử lại sau vài phút.")}
           </Alert>
@@ -103,7 +105,7 @@ export default function RoomPage() {
   if (state.status === "ended") {
     return (
       <main className="centered">
-        <Window title={t("Buổi học đã kết thúc")} file="bye.exe" variant="mint">
+        <Window title={t("Buổi học đã kết thúc")} file="bye.exe" variant="mint" headingLevel={1}>
           <p>{t("Cảm ơn bạn! Nội dung buổi học và bảng sẽ có ở mục \"Buổi đã học\".")}</p>
           <div className="btn-row">
             <ButtonLink variant="primary" to="/">
@@ -118,7 +120,7 @@ export default function RoomPage() {
   if (state.status === "error") {
     return (
       <main className="centered">
-        <Window title={t("Chưa vào được phòng")} file="error.exe" variant="danger">
+        <Window title={t("Chưa vào được phòng")} file="error.exe" variant="danger" headingLevel={1}>
           <p>{state.message}</p>
           <div className="btn-row">
             <Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>
@@ -134,7 +136,7 @@ export default function RoomPage() {
   const { join } = state;
   const isTeacher = join.role === "teacher";
   return (
-    <div className={`room room--${join.mode}`}>
+    <main className={`room room--${join.mode}`}>
       <header className="room__bar">
         <ButtonLink size="sm" to="/" aria-label={t("Rời phòng, về trang chính")}>
           ← {t("Rời phòng")}
@@ -179,6 +181,6 @@ export default function RoomPage() {
           </div>
         </form>
       </Dialog>
-    </div>
+    </main>
   );
 }

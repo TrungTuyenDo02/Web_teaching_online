@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { useParams } from "react-router-dom";
 import { backend } from "../lib/data";
-import { useAsync } from "../lib/hooks";
+import { useAsync, usePageTitle } from "../lib/hooks";
 import { ButtonLink } from "../ui/Button";
 import { ErrorState, Loading } from "../ui/Feedback";
 import { t } from "../lib/i18n";
@@ -12,13 +12,14 @@ const BoardViewer = lazy(() => import("../components/BoardViewer"));
 /** Xem lại bảng cuối buổi (chỉ xem), toàn màn hình như phòng học. */
 export default function BoardReviewPage() {
   const { sessionId = "" } = useParams();
+  usePageTitle(t("Bảng cuối buổi (chỉ xem)"));
   const board = useAsync(() => backend.loadBoard(sessionId), "Không tải được bảng đã lưu.");
 
   return (
-    <div className="room">
+    <main className="room">
       <header className="room__bar">
         <ButtonLink size="sm" to="/history">
-          ← {t("Buổi đã học")}
+          <span aria-hidden="true">←</span> {t("Buổi đã học")}
         </ButtonLink>
         <h1 className="room__title">{t("Bảng cuối buổi (chỉ xem)")}</h1>
       </header>
@@ -31,6 +32,6 @@ export default function BoardReviewPage() {
           <BoardViewer elements={board.data} />
         </Suspense>
       )}
-    </div>
+    </main>
   );
 }

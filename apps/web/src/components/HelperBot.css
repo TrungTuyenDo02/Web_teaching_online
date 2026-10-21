@@ -1,5 +1,7 @@
 /* Linh vật ngoài luồng đọc, cửa sổ chat dùng cùng Window/design tokens với ứng dụng. */
 .shell:has(.helper) .page { padding-bottom: calc(var(--sp-12) * 4); }
+/* Tab tới phần tử ở cuối khung nhìn: cuộn cao hơn linh vật để focus không bị che */
+html:has(.shell .helper) { scroll-padding-bottom: calc(var(--sp-12) * 4); }
 .helper {
   position: fixed; right: max(var(--gutter), env(safe-area-inset-right));
   bottom: max(var(--gutter), env(safe-area-inset-bottom)); z-index: var(--z-helper);

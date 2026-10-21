@@ -9,7 +9,7 @@ import { t } from "../lib/i18n";
 export default function DashboardPage() {
   const { user } = useAuth();
   return (
-    <AppShell>
+    <AppShell title={t("Trang chính")}>
       {user?.role === "teacher" ? (
         <TeacherHome />
       ) : user?.role === "student" ? (
