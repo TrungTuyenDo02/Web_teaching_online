@@ -35,6 +35,12 @@ supabase/.temp/
 # Claude Code: cài đặt riêng từng máy
 .claude/settings.local.json
 
+# Hướng dẫn AI và prompt thực hành chỉ giữ trên máy
+AGENTS.md
+CLAUDE.md
+/docs/claude-code-plan.md
+/docs/next-step-prompt.md
+
 # Playwright (test trình duyệt)
 test-results/
 playwright-report/
