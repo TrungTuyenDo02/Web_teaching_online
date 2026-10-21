@@ -6,7 +6,11 @@ import { useAsync } from "../lib/hooks";
 import { AppShell } from "../ui/AppShell";
 import { Button } from "../ui/Button";
 import { ConfirmDialog, Dialog } from "../ui/Dialog";
+import { Badge } from "../ui/Badge";
+import { Check } from "../ui/Check";
 import { Field } from "../ui/Field";
+import { PageHeader } from "../ui/PageHeader";
+import { Segmented } from "../ui/Segmented";
 import { Alert, Empty, ErrorState, Loading, useToast } from "../ui/Feedback";
 import { Window } from "../ui/Window";
 import { WeeklySlotsDialog } from "./teacher/WeeklySlotsDialog";
@@ -110,15 +114,15 @@ function StudentsManager() {
 
   return (
     <>
-      <div className="page__head">
-        <div>
-          <h1>{t("Học sinh")}</h1>
-          <p className="page__lead">{t("Hồ sơ, tài khoản đăng nhập và số buổi đã dạy.")}</p>
-        </div>
-        <Button variant="primary" size="lg" onClick={() => setEditing({ student: null })}>
-          {t("Thêm học sinh")}
-        </Button>
-      </div>
+      <PageHeader
+        title={t("Học sinh")}
+        lead={t("Hồ sơ, tài khoản đăng nhập và số buổi đã dạy.")}
+        actions={
+          <Button variant="primary" size="lg" onClick={() => setEditing({ student: null })}>
+            {t("Thêm học sinh")}
+          </Button>
+        }
+      />
 
       <Window title={t("Danh sách học sinh")} file="students.db" variant="lavender">
         <div className="toolbar">
@@ -127,19 +131,16 @@ function StudentsManager() {
               <input {...control} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Ví dụ: An, 8A")} />
             )}
           </Field>
-          <div className="segmented" role="group" aria-label={t("Lọc theo trạng thái")}>
-            {(
-              [
-                ["active", t("Đang học ({n})", { n: counts.active })],
-                ["inactive", t("Ngừng dạy ({n})", { n: counts.inactive })],
-                ["all", t("Tất cả ({n})", { n: students.length })],
-              ] as const
-            ).map(([value, label]) => (
-              <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label={t("Lọc theo trạng thái")}
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "active", label: t("Đang học ({n})", { n: counts.active }) },
+              { value: "inactive", label: t("Ngừng dạy ({n})", { n: counts.inactive }) },
+              { value: "all", label: t("Tất cả ({n})", { n: students.length }) },
+            ]}
+          />
         </div>
 
         {/* Báo gọn số dòng khi tìm/lọc thay vì đọc lại cả danh sách */}
@@ -168,11 +169,11 @@ function StudentsManager() {
                   </span>
                   <span className="btn-row">
                     {s.deleting_at ? (
-                      <span className="badge badge--danger">{t("Đang xóa")}</span>
+                      <Badge tone="danger">{t("Đang xóa")}</Badge>
                     ) : (
-                      <span className={`badge ${s.active ? "badge--live" : "badge--done"}`}>{s.active ? t("Đang học") : t("Ngừng dạy")}</span>
+                      <Badge tone={s.active ? "live" : "done"}>{s.active ? t("Đang học") : t("Ngừng dạy")}</Badge>
                     )}
-                    {!s.consent_at && <span className="badge badge--warn">{t("Chưa ghi nhận phụ huynh đồng ý")}</span>}
+                    {!s.consent_at && <Badge tone="warn">{t("Chưa ghi nhận phụ huynh đồng ý")}</Badge>}
                   </span>
                 </div>
                 <div className="item__meta">
@@ -363,10 +364,9 @@ function StudentFormDialog({
             {(c) => <input {...c} value={draft.guardian_contact} onChange={(e) => set("guardian_contact", e.target.value)} maxLength={200} />}
           </Field>
         </div>
-        <label className="check">
-          <input type="checkbox" checked={draft.consent} onChange={(e) => set("consent", e.target.checked)} />
+        <Check checked={draft.consent} onChange={(e) => set("consent", e.target.checked)}>
           {t("Phụ huynh đã đồng ý cho lưu dữ liệu học tập")}
-        </label>
+        </Check>
         <div className="btn-row btn-row--end">
           <Button onClick={onClose} disabled={busy}>
             {t("Thôi")}

@@ -60,3 +60,34 @@ test("AI-03 giáo viên thêm rồi gỡ tài liệu qua xác nhận @smoke", as
   await page.getByRole("dialog", { name: "Gỡ bài giảng?" }).getByRole("button", { name: "Gỡ bài giảng", exact: true }).click();
   await expect(page.getByText("Chưa có bài giảng", { exact: true })).toBeVisible();
 });
+
+test("AI-04 Teacher-Ops chỉ giáo viên thấy, đổi chế độ phải đồng ý lại, gọi đúng endpoint chỉ đọc @smoke", async ({ page, fake }) => {
+  fake.on("GET", /^\/api\/assistant\/status$/, () => ({ status: 200, body: { enabled: true, student_lessons: false, daily_limit: 20 } }));
+  const asked: string[] = [];
+  fake.on("POST", /^\/api\/assistant\/teacher-ops$/, ({ body }) => {
+    asked.push((body as { question: string }).question);
+    return { status: 200, body: { answer: "Tuần này có 2 buổi với Nguyễn Lan Anh.", mode: "openai", sources: [] } };
+  });
+  await signIn(page, TEACHER); await page.goto("/");
+  await page.getByRole("button", { name: "Mở trợ giúp", exact: true }).click();
+  const chat = page.getByRole("dialog", { name: "Bạn đồng hành" });
+  await chat.getByRole("button", { name: "Hỏi AI", exact: true }).click();
+  await chat.getByRole("checkbox").check();
+  await chat.getByRole("button", { name: "Lịch & lớp", exact: true }).click();
+  await expect(chat.getByRole("checkbox")).not.toBeChecked();
+  await expect(chat.getByText(/Tên học sinh được thay bằng mã/)).toBeVisible();
+  await chat.getByRole("checkbox").check();
+  await chat.getByRole("button", { name: "Tuần này tôi có những buổi nào?" }).click();
+  await expect(chat.getByRole("log")).toContainText("Tuần này có 2 buổi với Nguyễn Lan Anh.");
+  expect(asked).toEqual(["Tuần này tôi có những buổi nào?"]);
+  expect(fake.calls.some((call) => call.includes("POST /api/assistant/chat"))).toBe(false);
+});
+
+test("AI-05 học sinh không có chế độ Teacher-Ops", async ({ page, fake }) => {
+  fake.on("GET", /^\/api\/assistant\/status$/, () => ({ status: 200, body: { enabled: true, student_lessons: false, daily_limit: 20 } }));
+  await signIn(page, STUDENT); await page.goto("/");
+  await page.getByRole("button", { name: "Mở trợ giúp", exact: true }).click();
+  const chat = page.getByRole("dialog", { name: "Bạn đồng hành" });
+  await expect(chat.getByRole("button", { name: "Hỏi AI", exact: true })).toBeVisible();
+  await expect(chat.getByRole("button", { name: "Lịch & lớp" })).toHaveCount(0);
+});

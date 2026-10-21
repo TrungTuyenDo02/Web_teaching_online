@@ -7,7 +7,7 @@ import * as api from "./api";
 import { supabase } from "./supabase";
 import { t } from "./i18n";
 
-export type { DeviceMode, JoinResponse, Role, SessionCreate, SessionUpdate, Student, StudentInput, WeeklySlot, WeeklySlotInput } from "./api";
+export type { AssignmentInput, DeviceMode, JoinResponse, Role, SessionCreate, SessionUpdate, Student, StudentInput, WeeklySlot, WeeklySlotInput } from "./api";
 
 export interface SessionItem {
   id: string;
@@ -38,9 +38,22 @@ export interface StudentOption {
 
 export type EndResult = Awaited<ReturnType<typeof api.endSession>>;
 
+export interface SubmissionItem extends api.Submission {
+  files: api.SubmissionFile[];
+  /** Kết quả OCR mới nhất trước; RLS trả rỗng cho học sinh (gợi ý chỉ cho giáo viên) */
+  transcripts: api.Transcript[];
+}
+
+export interface AssignmentItem extends api.Assignment {
+  student_name: string;
+  /** Lượt nộp mới nhất trước */
+  submissions: SubmissionItem[];
+}
+
 export interface Backend {
   assistantStatus: typeof api.assistantStatus;
   askAssistant: typeof api.askAssistant;
+  askTeacherOps: typeof api.askTeacherOps;
   listAssistantMaterials: typeof api.listAssistantMaterials;
   getAssistantMaterial: typeof api.getAssistantMaterial;
   createAssistantMaterial: typeof api.createAssistantMaterial;
@@ -69,6 +82,14 @@ export interface Backend {
   listWeeklySlots: typeof api.listWeeklySlots;
   createWeeklySlot: typeof api.createWeeklySlot;
   stopWeeklySlot: typeof api.stopWeeklySlot;
+  listAssignments(): Promise<AssignmentItem[]>;
+  /** URL tạm (10 phút) để xem ảnh bài làm; Storage RLS: GV của học sinh hoặc chính học sinh */
+  submissionImageUrl(path: string): Promise<string>;
+  createAssignment: typeof api.createAssignment;
+  submitAssignment: typeof api.submitAssignment;
+  addSubmissionImage: typeof api.addSubmissionImage;
+  ocrSubmission: typeof api.ocrSubmission;
+  returnSubmission: typeof api.returnSubmission;
 }
 
 type Joined = { students: { full_name: string } | { full_name: string }[] | null };
@@ -88,6 +109,7 @@ function client() {
 const supabaseBackend: Backend = {
   assistantStatus: api.assistantStatus,
   askAssistant: api.askAssistant,
+  askTeacherOps: api.askTeacherOps,
   listAssistantMaterials: api.listAssistantMaterials,
   getAssistantMaterial: api.getAssistantMaterial,
   createAssistantMaterial: api.createAssistantMaterial,
@@ -154,6 +176,35 @@ const supabaseBackend: Backend = {
   listWeeklySlots: api.listWeeklySlots,
   createWeeklySlot: api.createWeeklySlot,
   stopWeeklySlot: api.stopWeeklySlot,
+  async listAssignments() {
+    const { data, error } = await client()
+      .from("assignments")
+      .select("*, students(full_name), submissions(*, submission_files(*), submission_transcripts(*))")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) readFailed();
+    type Row = api.Assignment & Joined & { submissions: (api.Submission & { submission_files: api.SubmissionFile[]; submission_transcripts: api.Transcript[] })[] };
+    const newest = <T,>(rows: T[], key: (r: T) => string) => [...rows].sort((a, b) => key(b).localeCompare(key(a)));
+    return ((data ?? []) as unknown as Row[]).map(({ submissions, students, ...row }) => ({
+      ...row,
+      student_name: nameOf({ students }),
+      submissions: newest(submissions ?? [], (s) => s.submitted_at).map(({ submission_files, submission_transcripts, ...s }) => ({
+        ...s,
+        files: [...(submission_files ?? [])],
+        transcripts: newest(submission_transcripts ?? [], (x) => x.created_at),
+      })),
+    }));
+  },
+  async submissionImageUrl(path) {
+    const { data, error } = await client().storage.from("submissions").createSignedUrl(path, 600);
+    if (error || !data) throw new Error("Không tải được ảnh bài làm.");
+    return data.signedUrl;
+  },
+  createAssignment: api.createAssignment,
+  submitAssignment: api.submitAssignment,
+  addSubmissionImage: api.addSubmissionImage,
+  ocrSubmission: api.ocrSubmission,
+  returnSubmission: api.returnSubmission,
 };
 
 export let backend: Backend = supabaseBackend;

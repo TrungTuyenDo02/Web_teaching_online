@@ -39,7 +39,9 @@ Giao diện mô phỏng **hệ điều hành cổ điển (Windows 95/98, Mac OS
 
 ## 3. Design tokens
 
-Đặt trong `tokens.css` (hoặc `:root` của global CSS) và import ở mọi nơi.
+Nguồn chuẩn là `apps/web/src/styles/tokens.css`; khối dưới đây là bản gốc của bảng màu. Khi hai nơi khác nhau, `tokens.css` đúng. Bản triển khai thêm các token: `--danger-ink`/`--success-ink`/`--warning-ink` và nền `-100` (chữ trạng thái đạt 4,5:1), `--text-xs` (0,75rem, chỉ nhãn ASCII trang trí), `--text-2xl` (2rem), `--fw-bold` 700 / `--fw-heavy` 800 / `--fw-black` 900, `--shadow-hard-hover`, `--shadow-danger`, `--touch` 44px, `--overlay`, lớp `--z-*`. Không viết số độ đậm, cỡ chữ, bóng trực tiếp trong CSS.
+
+**Ngoại lệ có chủ đích:** khoảng cách dưới 4px trong chi tiết pixel (chấm title bar 6px, ô thanh tải 3px, đệm dọc badge 2px), hình tròn `border-radius: 50%`, kích thước chữ trong SVG theo đơn vị viewBox, thời gian của hiệu ứng trang trí (nhấp nháy, thanh tải). Breakpoint chỉ dùng `640px` và `1024px` (`1023px` là phía `max-width` của 1024); `max-height` 540/580px chỉ cho linh vật trên màn thấp.
 
 ```css
 :root {
@@ -88,10 +90,12 @@ Giao diện mô phỏng **hệ điều hành cổ điển (Windows 95/98, Mac OS
   --sp-4: 16px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
 
   /* --- Typography --- */
-  --font-pixel:   "Silkscreen", "VT323", monospace;          /* nhãn, title bar, nút nhỏ */
-  --font-serif:   "DM Serif Display", "Playfair Display", serif; /* tiêu đề lớn, tên */
-  --font-body:    "Nunito", "Quicksand", system-ui, sans-serif;  /* nội dung dài, dễ đọc */
-  --font-mono:    "Space Mono", monospace;                    /* tên file, code */
+  /* Triển khai: chỉ Nunito được đóng gói (@fontsource-variable/nunito), không tải font ngoài.
+     Font pixel không có dấu tiếng Việt: chỉ cho nhãn ASCII (tên tệp trên title bar),
+     không tải Silkscreen nên hiển thị bằng font mono của máy. Tiêu đề dùng Nunito 900. */
+  --font-pixel:   "Silkscreen", "VT323", monospace;          /* chỉ nhãn ASCII trang trí */
+  --font-body:    "Nunito", "Quicksand", system-ui, sans-serif;  /* mọi chữ có dấu */
+  --font-mono:    "Space Mono", monospace;                    /* code */
 
   /* --- Motion --- */
   --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
@@ -102,7 +106,7 @@ Giao diện mô phỏng **hệ điều hành cổ điển (Windows 95/98, Mac OS
 
 ### Quy tắc dùng màu
 - Mỗi cửa sổ chọn **một** màu title bar (lavender / pink / peach / periwinkle). Không trộn nhiều màu trong một title bar.
-- Nút chính (CTA): `--pink-400` hoặc `--periwinkle-400`. Nút phụ: nền trắng.
+- Nút chính (CTA): `--periwinkle-400` (chữ 5,9:1). Không dùng `--pink-400` làm nền chữ (chỉ 4,3:1); title bar hồng dùng `--pink-200`. Nút phụ: nền trắng.
 - Chữ chính luôn `--ink-900` trên nền sáng. Không dùng chữ pastel trên nền pastel cho nội dung quan trọng.
 - Vùng nhấn "bể kính mint" (`--mint-400`) dùng cho hero / vùng minh họa, không dùng làm nền cả trang.
 
@@ -129,7 +133,7 @@ Tùy chọn: thêm lớp gradient mờ tím-hồng phía trên (`radial-gradient
 ## 5. Component cốt lõi
 
 ### 5.1 Window (component quan trọng nhất)
-Cấu trúc: `Window` > `TitleBar` (tiêu đề + nút `_ ▢ ✕`) + `Body`.
+Cấu trúc: `Window` > `TitleBar` (ba chấm trang trí `aria-hidden`, tiêu đề là heading h1–h3, tên tệp ASCII, nút thật qua `actions`) + `Body`. **Triển khai không có nút `_ ▢ ✕` giả**: nút nào hiện ra cũng phải hoạt động và ≥ 44px; tiêu đề viết thường bằng Nunito (không in hoa, không font pixel) để giữ dấu tiếng Việt. Khối CSS dưới đây là ý tưởng gốc.
 
 ```css
 .window {
@@ -162,54 +166,68 @@ Variants: `--lavender`, `--pink`, `--peach`, `--periwinkle`, `--glass` (nền `-
 Nút `✕` hover: nền `--danger`. Nút `_` / `▢` chỉ trang trí nếu chưa có chức năng, phải có `aria-hidden` hoặc `aria-label` rõ ràng.
 
 ### 5.2 Button
-- Pill hoặc chữ nhật bo nhẹ, viền `--border`, bóng `--shadow-hard-sm`, font pixel hoặc body đậm.
-- Hover: dịch lên `translate(-1px,-1px)`, bóng tăng. Active: `translate(3px,3px)`, bóng về 0 (cảm giác nhấn xuống).
-- Disabled: nền `--lavender-100`, chữ `--ink-500`, không bóng.
+- `Button` (hành động) và `ButtonLink` (điều hướng trong ứng dụng, mở được tab mới). Không viết tay `<button className="btn">` hay `<a href>` cho route nội bộ (tải lại cả trang); `<a className="btn">` chỉ cho neo trong trang hoặc link bỏ qua.
+- Biến thể: `secondary` (mặc định, nền trắng), `primary` (periwinkle), `accent` (mint), `danger` (chữ/viền `--danger-ink`, bóng `--shadow-danger`), `ghost` (gạch chân, không viền). Cỡ: `sm`, `md`, `lg`; mọi cỡ cao ≥ 44px. `block` để rộng hết hàng.
+- Chữ Nunito `--fw-heavy`. Hover: `translate(-1px,-1px)` + `--shadow-hard-hover`; active: `translate(3px,3px)`, bóng về 0; tắt trên thiết bị cảm ứng và khi giảm chuyển động.
+- Focus: outline 3px `--ink-900` lệch 2px (trên nền tối đổi `--bg-window`).
+- Disabled: nền `--lavender-100`, chữ `--ink-700` (không dùng `--ink-500`: chữ nhỏ dưới 4,5:1), viền `--ink-500`, không bóng.
+- `busy` + `busyLabel`: khóa nút, đổi chữ, `aria-busy`, giữ nguyên kích thước.
 
 ### 5.3 Input / Form (kiểu "LOGIN")
-- Input nền trắng, viền `--border`, bo `--radius-sm`, focus: outline 3px `--ink-900`, lệch ra 2px (giữ viền tối).
-- Label dùng font pixel cỡ nhỏ, in hoa.
+- Mọi ô nhập đi qua `Field` (`label`, `hint`, `error`, `required`): nhãn gắn `htmlFor`, gợi ý và lỗi qua `aria-describedby`, lỗi có `role="alert"` và `aria-invalid`, ô bắt buộc có `*` kèm chữ ẩn "(bắt buộc)".
+- Input nền trắng, viền `--border`, bo `--radius-sm`, cao ≥ 44px, focus: outline 3px `--ink-900`, lệch ra 2px (giữ viền tối). Lỗi: viền và nền `--danger-ink`/`--danger-100`.
+- Nhãn: Nunito `--text-sm` `--fw-heavy`, viết thường (font pixel không có dấu tiếng Việt).
+- Ô tích dùng `Check`: ô 24px trong dòng cao 44px, nhãn bao ngoài nên bấm cả chữ được, `accent-color: --lilac-700`. Không viết tay `<label className="check">`.
 - Form đăng nhập đặt trong `Window` variant peach hoặc pink.
 
 ### 5.4 Progress / Loading bar
-- Khung viền đậm, các ô vuông nhỏ lấp đầy dần (`pink-400` phần đã xong, `peach-300` phần chờ), kèm nút `CANCEL`.
-- Có biến thể spinner = **hourglass** pixel thay cho vòng xoay.
+- Triển khai (`Loading` trong `ui/Feedback.tsx`): khung viền đậm, sáu ô vuông lấp lần lượt, kèm chữ trạng thái, `role="status"`; tắt chuyển động khi giảm chuyển động. Chưa có tiến độ thật, nút `CANCEL` hay đồng hồ cát (không cần ở giai đoạn 1).
+- `Empty`: biểu tượng ✦ `aria-hidden`, câu ngắn và hành động tiếp theo. `ErrorState`: `Alert` lỗi kèm nút "Thử lại".
 
-### 5.5 Slider (âm lượng, tiến trình)
+### 5.5 Slider (âm lượng, tiến trình) — chưa dùng
 - Track bo tròn viền đậm, nền `--lavender-300`, phần fill `--periwinkle-400`, thumb tròn trắng viền đậm. Icon loa ở đầu trái.
 
-### 5.6 Icon & file
+### 5.6 Icon & file — chưa dùng (chỉ tên tệp ASCII trên title bar)
 - **Folder, file, media, dấu ✕ trong vòng tròn:** nét mảnh viền đậm, fill pastel phẳng (peach cho folder, trắng cho file).
 - Dưới icon luôn có nhãn nhỏ, font mono hoặc pixel (`folder 1`, `media 1`).
 - **Cursor:** mũi tên pixel, tay trỏ, hourglass. Có thể thay con trỏ chuột toàn site bằng cursor tùy chỉnh (cần fallback `auto`).
 
 ### 5.7 Dialog / Error popup
-- Window nhỏ, title bar `--danger` hoặc pink, tiêu đề `ERROR`, icon cảnh báo, 1–2 nút. Nội dung thân thiện, không đổ lỗi người dùng.
+- Triển khai: `Dialog` dùng `<dialog>` gốc (`showModal`: giữ focus bên trong, Esc đóng, trả focus về nút mở), một nút "Đóng" thật trên title bar, không đóng khi đang gửi. `ConfirmDialog` cho thao tác hậu quả lớn: biến thể `danger`, tùy chọn bắt tích xác nhận, lỗi `role="alert"`. Trang 404 và lỗi phòng dùng `Window` variant `danger` với h1.
+- Window nhỏ, title bar `--danger-100` hoặc pink, icon cảnh báo, 1–2 nút. Nội dung thân thiện, không đổ lỗi người dùng.
 - Hiệu ứng glitch nhẹ (dịch pixel 1–2px, màu cyan/pink) chỉ dùng cho **trang lỗi** hoặc **hover**, không dùng thường trực.
 
-### 5.8 Media player
+### 5.8 Media player — chưa dùng (video do LiveKit vẽ)
 - Window tím nhạt, có icon loa, thanh trượt, nút ▶ ⏭, nền mây. Dùng cho trình phát nhạc hoặc video/lesson.
 
-### 5.9 Profile / Artist card (kiểu `cherrionse.png`)
+### 5.9 Profile / Artist card (kiểu `cherrionse.png`) — chưa dùng
 - Window có tên file làm tiêu đề (`name.exe`, `avatar.png`), ảnh đại diện tròn, dòng "17 YEARS OLD", nhãn vai trò trong ngoặc kép, nút `FOLLOW`.
 
 ### 5.10 Trang trí (Decor)
-Tạo component `Decor` nhận `type`: `sparkle | star4 | cloud | moon | starburst | flower | constellation | dots`.
+Component `Decor` nhận `type`. Đã có: `sparkle | star4 | cloud | moon`; chưa làm: `starburst | flower | constellation | dots`.
 - Chỉ dùng SVG, `pointer-events: none`, `aria-hidden="true"`.
 - Mây: trắng kem viền nhẹ, đặt chồng lên mép cửa sổ.
 - Chuỗi **pha mặt trăng** dọc theo mép trang làm điểm nhấn.
 - Starburst cam/pink phía sau window làm "sticker".
 - Hoa, nho, dây leo nhỏ ở góc folder để thêm sự mơ mộng.
 
+### 5.11 Badge và thông báo
+- `Badge` (`tone`: `scheduled`, `live`, `done`, `warn`, `danger`): nhãn nhỏ luôn có chữ, màu chỉ là phụ. `SessionStatus` dựng trên `Badge`. Không viết tay `<span className="badge">`.
+- `Alert` (`tone`: `info`, `success`, `warning`, `error`): biểu tượng + chữ, lỗi `role="alert"`, còn lại `role="status"`; có thể kèm nút hành động. Toast (`useToast`): tối đa 3, lỗi giữ đến khi đóng, còn lại tự ẩn sau 6 giây, nút "Đóng".
+
+### 5.12 Segmented
+- `Segmented` (`label`, `options`, `value`, `onChange`, `disabled`): nhóm nút chọn một, `role="group"` có tên, mỗi nút `aria-pressed`, cao ≥ 44px, focus vẽ vào trong. `ariaLabel` của lựa chọn phải bắt đầu bằng chữ đang hiện (WCAG 2.5.3, ví dụ "VI – Tiếng Việt"). Dùng cho chọn ngôn ngữ, bộ lọc, chế độ linh vật.
+
 ---
 
 ## 6. Layout & bố cục
 
+- **Đầu trang:** `PageHeader` (`title` là h1 duy nhất của trang, `lead`, `actions`); tiêu đề tab đặt qua `AppShell title` hoặc `usePageTitle`.
 - **Desktop:** các Window sắp chồng lệch nhau (isometric / floating), có thể kéo thả (tùy chọn). Giữ trục đọc rõ ràng, nội dung chính ở window lớn nhất ở giữa.
 - **Mobile:** xếp dọc, mỗi section là một Window full-width (trừ gutter 16px), bỏ chồng lệch, giảm decor.
-- Breakpoint gợi ý: `640px`, `1024px`.
+- Breakpoint: chỉ `640px` và `1024px`.
 - Bóng cứng giảm xuống `--shadow-hard-sm` trên mobile.
-- Thanh điều hướng = **taskbar** (cố định dưới hoặc trên): nút `Start`, các tab cửa sổ, đồng hồ nhỏ.
+- Thanh điều hướng = **taskbar** (cố định trên): tên ứng dụng, link theo vai trò (`aria-current`), chọn ngôn ngữ, tài khoản. Dưới 640px link thành dải cuộn ngang có bóng mờ ở mép khi còn mục bị khuất. Chưa có nút `Start` hay đồng hồ.
 
 ---
 
@@ -248,7 +266,7 @@ Tạo component `Decor` nhận `type`: `sparkle | star4 | cloud | moon | starbur
 1. **Đọc file này trước.** Nếu dự án đã có framework/UI lib, giữ nguyên stack, chỉ áp tokens và component theo file này.
 2. Tạo theo thứ tự: `tokens.css` → global styles (nền grid, font) → `Window` → `Button` → `Input` → `Decor` → các component còn lại → trang.
 3. Mỗi component nằm riêng file, nhận props rõ ràng (`variant`, `title`, `onClose`...), dùng CSS variables, không hard-code màu.
-4. Font: nạp qua Google Fonts hoặc `@fontsource` (Silkscreen, DM Serif Display, Nunito, Space Mono), dùng `font-display: swap`.
+4. Font: chỉ Nunito qua `@fontsource-variable/nunito`, đóng gói vào bản build. Không tải từ Google Fonts hay CDN (học sinh vị thành niên, mạng yếu); không dùng Georgia/serif cho chữ có dấu.
 5. Icon/decor: ưu tiên SVG inline hoặc sprite, tối ưu kích thước; không dùng ảnh raster nặng.
 6. Không copy nguyên bất kỳ minh họa, nhân vật, tên hay logo từ ảnh tham khảo. Chỉ lấy **phong cách, bảng màu và cấu trúc**; vẽ asset gốc riêng.
 7. Hiệu năng: giới hạn số phần tử decor động, dùng `transform`/`opacity` cho animation, lazy-load asset ngoài màn hình đầu.
@@ -259,8 +277,9 @@ Tạo component `Decor` nhận `type`: `sparkle | star4 | cloud | moon | starbur
 ## 11. Checklist trước khi coi là xong
 
 - [ ] Nền giấy kẻ ô hiển thị đúng, không lệch trên mobile.
-- [ ] Mọi card/modal/form đều là `Window` có title bar và nút điều khiển.
-- [ ] Không có màu hard-code ngoài tokens.
+- [ ] Mọi card/modal/form đều là `Window` có title bar; không có nút điều khiển giả.
+- [ ] Không có màu, độ đậm, cỡ chữ, bóng hard-code ngoài tokens (trừ ngoại lệ ở mục 3).
+- [ ] Dùng component sẵn có (`Button`/`ButtonLink`, `Field`, `Check`, `Badge`, `Segmented`, `PageHeader`) thay vì viết tay class.
 - [ ] Hover/active/focus/disabled có đủ cho nút và input.
 - [ ] Hoạt động tốt ở 360px, 768px, 1280px.
 - [ ] `prefers-reduced-motion` hoạt động.

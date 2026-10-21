@@ -295,3 +295,71 @@ class WeeklySlotCreated(BaseModel):
 class WeeklySlotStopped(BaseModel):
     slot: WeeklySlot
     cancelled: int
+
+
+# ---------- Bài tập, bài nộp, OCR (0011: chỉ ghi qua API) ----------
+
+
+class AssignmentStatus(StrEnum):
+    assigned = "assigned"
+    submitted = "submitted"
+    returned = "returned"
+
+
+class SubmissionStatus(StrEnum):
+    submitted = "submitted"
+    reviewing = "reviewing"
+    returned = "returned"
+
+
+class AssignmentRow(BaseModel):
+    id: str
+    student_id: str
+    session_id: str | None = None
+    title: str
+    description: str | None = None
+    due_at: datetime | None = None
+    status: AssignmentStatus
+    created_at: datetime
+
+
+class AssignmentCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    student_id: UUID
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=4000)
+    due_at: AwareDatetime | None = None
+
+
+class SubmissionRow(BaseModel):
+    id: str
+    student_id: str
+    assignment_id: str | None = None
+    status: SubmissionStatus
+    submitted_at: datetime
+    teacher_comment: str | None = None
+    score: float | None = None
+    returned_at: datetime | None = None
+
+
+class SubmissionFileRow(BaseModel):
+    id: str
+    submission_id: str
+    storage_path: str
+    kind: str = "original"
+    mime_type: str | None = None
+    size_bytes: int | None = None
+
+
+class SubmissionTranscript(BaseModel):
+    id: str
+    submission_id: str
+    model: str
+    content: str
+    created_at: datetime
+
+
+class SubmissionReturn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    teacher_comment: str = Field(default="", max_length=4000)
+    score: float | None = Field(default=None, ge=0, le=10)

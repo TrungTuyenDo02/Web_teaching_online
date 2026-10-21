@@ -168,6 +168,8 @@ export class FakeBackend {
     if (table === "students") {
       return { status: 200, body: this.students.filter((s) => s.active).map(({ id, full_name }) => ({ id, full_name })) };
     }
+    // Bài tập (0011): chưa có bài nào trong dữ liệu giả; luồng bài tập kiểm ở assignments.spec.ts (xem trước)
+    if (table === "assignments") return { status: 200, body: [] };
     return undefined;
   }
 

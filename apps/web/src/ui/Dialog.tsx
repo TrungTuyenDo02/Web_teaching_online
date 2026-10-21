@@ -1,6 +1,7 @@
 import { t } from "../lib/i18n";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "./Button";
+import { Check } from "./Check";
 import { Window, type WindowVariant } from "./Window";
 
 interface DialogProps {
@@ -46,7 +47,7 @@ export function Dialog({ open, title, file, variant = "lavender", onClose, busy,
           file={file}
           variant={variant}
           actions={
-            <Button size="sm" variant="secondary" onClick={onClose} disabled={busy} aria-label={t("Đóng hộp thoại")}>
+            <Button size="sm" onClick={onClose} disabled={busy} aria-label={t("Đóng hộp thoại")}>
               {t("Đóng")}
             </Button>
           }
@@ -100,10 +101,9 @@ export function ConfirmDialog({
       <form className="form" onSubmit={onSubmit}>
         <div className="stack">{children}</div>
         {acknowledge && (
-          <label className="check">
-            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+          <Check checked={checked} onChange={(e) => setChecked(e.target.checked)}>
             {acknowledge}
-          </label>
+          </Check>
         )}
         {error && (
           <p className="field__error" role="alert">

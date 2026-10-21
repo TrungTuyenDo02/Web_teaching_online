@@ -7,9 +7,11 @@ import { locale, t } from "../lib/i18n";
 import { teachingNotesExport } from "../lib/teachingNotesExport";
 import { AppShell } from "../ui/AppShell";
 import { Button } from "../ui/Button";
+import { Check } from "../ui/Check";
 import { Dialog } from "../ui/Dialog";
 import { Field } from "../ui/Field";
 import { Alert, Empty, ErrorState, Loading, useToast } from "../ui/Feedback";
+import { PageHeader } from "../ui/PageHeader";
 import { Window } from "../ui/Window";
 
 const noteError = (err: unknown, fallback: string) => err instanceof Error && /[À-ỹ]/.test(err.message) ? err.message : fallback;
@@ -84,10 +86,9 @@ function NoteEditor({ initial, catalog, onClose, onSaved }: { initial: TeachingR
             <legend>{t("Chủ đề đã dạy trong buổi này")}</legend>
             {topics.length === 0 && <p className="muted">{t("Chưa có chủ đề. Bạn có thể tạo bên dưới.")}</p>}
             {topics.map((topic) => (
-              <label className="check" key={topic.id}>
-                <input type="checkbox" checked={record.topic_ids.includes(topic.id)} disabled={!record.topic_ids.includes(topic.id) && record.topic_ids.length >= 50} onChange={(event) => setRecord((r) => ({ ...r, topic_ids: event.target.checked ? [...r.topic_ids, topic.id] : r.topic_ids.filter((id) => id !== topic.id) }))} />
+              <Check key={topic.id} checked={record.topic_ids.includes(topic.id)} disabled={!record.topic_ids.includes(topic.id) && record.topic_ids.length >= 50} onChange={(event) => setRecord((r) => ({ ...r, topic_ids: event.target.checked ? [...r.topic_ids, topic.id] : r.topic_ids.filter((id) => id !== topic.id) }))}>
                 {topic.name}{topic.grade && t(" · Lớp {grade}", { grade: topic.grade })}
-              </label>
+              </Check>
             ))}
           </fieldset>
           <div className="form__grid">
@@ -132,7 +133,7 @@ function NotesForMonth({ studentId, studentName, month }: { studentId: string; s
         <ul className="items">{records.map((record) => (
           <li key={record.session_id} className="item">
             <div className="item__top"><strong id={`note-${record.session_id}`}>{record.subject || t("Buổi học")}{record.scheduled_topic && ` · ${record.scheduled_topic}`}</strong><span>{vnDate(record.scheduled_start)}</span></div>
-            <p className="note-text">{record.summary_md || t("Chưa ghi nhận xét riêng.")}</p>
+            <p className="prose-text">{record.summary_md || t("Chưa ghi nhận xét riêng.")}</p>
             <p className="muted">{t("Chủ đề đã dạy: {topics}", { topics: record.topic_ids.map((id) => topics.find((topic) => topic.id === id)?.name || t("Chủ đề không còn trong danh mục")).join("; ") || t("Chưa chọn") })}</p>
             <Button onClick={() => setEditing(record)} aria-describedby={`note-${record.session_id}`}>{t("Ghi chú riêng")}</Button>
           </li>
@@ -150,7 +151,7 @@ function TeacherNotes() {
   const student = students.data?.find((s) => s.id === studentId);
   return (
     <>
-      <div className="page__head"><div><h1>{t("Ghi chú riêng")}</h1><p className="page__lead">{t("Đánh giá sau buổi và chủ đề đã dạy. Chỉ giáo viên xem và tải về.")}</p></div></div>
+      <PageHeader title={t("Ghi chú riêng")} lead={t("Đánh giá sau buổi và chủ đề đã dạy. Chỉ giáo viên xem và tải về.")} />
       {students.error ? <ErrorState message={t(students.error)} onRetry={() => void students.reload()} /> : students.loading ? <Loading label={t("Đang tải học sinh…")} /> : (
         <div className="form__grid">
           <Field label={t("Học sinh ghi chú")}>{(control) => <select {...control} value={studentId} onChange={(event) => setStudentId(event.target.value)}><option value="">{t("Chọn học sinh")}</option>{students.data?.map((s) => <option key={s.id} value={s.id}>{s.full_name}{!s.active && t(" · Đã ngừng dạy")}</option>)}</select>}</Field>

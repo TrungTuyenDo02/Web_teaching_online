@@ -1,4 +1,4 @@
--- Kiểm tra CHỈ ĐỌC sau khi áp migration 0003–0009 lên Supabase (dán vào SQL Editor, bấm Run).
+-- Kiểm tra CHỈ ĐỌC sau khi áp migration 0003–0011 lên Supabase (dán vào SQL Editor, bấm Run).
 -- Mỗi dòng một mục; cột `dat` phải là true hết. null nghĩa là thiếu cột/bảng (migration chưa áp).
 -- Không đọc dữ liệu học sinh, chỉ đọc catalog và đếm số buổi.
 with col as (
@@ -77,6 +77,17 @@ select muc, dat from (values
       and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.search_assistant_chunks(uuid,text)'), 'execute'), true)),
   (22, '0010: hạn mức chỉ service_role',
       coalesce(has_function_privilege('service_role', to_regprocedure('public.reserve_assistant_turn(uuid,date,integer,integer)'), 'execute'), false)
-      and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.reserve_assistant_turn(uuid,date,integer,integer)'), 'execute'), true))
+      and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.reserve_assistant_turn(uuid,date,integer,integer)'), 'execute'), true)),
+  (23, '0011: trình duyệt không ghi được assignments/submissions/submission_files',
+      not has_table_privilege('authenticated', 'public.assignments', 'insert,update,delete')
+      and not has_table_privilege('authenticated', 'public.submissions', 'insert,update,delete')
+      and not has_table_privilege('authenticated', 'public.submission_files', 'insert,update,delete')),
+  (24, '0011: trình duyệt không tải ảnh bài làm lên Storage',
+      not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
+                  and policyname in ('submissions_objects_student_insert', 'submissions_objects_teacher_all'))),
+  (25, '0011: submission_transcripts bật RLS, trình duyệt chỉ đọc',
+      coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.submission_transcripts')), false)
+      and coalesce(has_table_privilege('authenticated', to_regclass('public.submission_transcripts'), 'select'), false)
+      and not coalesce(has_table_privilege('authenticated', to_regclass('public.submission_transcripts'), 'insert,update,delete'), false))
 ) as t(stt, muc, dat)
 order by stt;

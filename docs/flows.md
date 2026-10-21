@@ -441,6 +441,44 @@ flowchart TD
 
 Học sinh chỉ có hướng dẫn ứng dụng khi cờ bài giảng HS tắt. Khi bật, bài giảng phải được công bố và thuộc chủ đề đã dạy trong buổi completed của đúng học sinh/GV. Chưa dùng embedding hoặc đọc PDF; chưa kiểm model thật E6/E7. Agent không có tool ghi nghiệp vụ; lỗi provider/guard/nguồn được chặn. Xem [assistant.md](assistant.md); chưa hoàn tất M1b/M4.
 
+## 8e. Teacher-Ops chỉ đọc (M1b.1)
+
+```mermaid
+flowchart TD
+  A[Giáo viên chọn Lịch & lớp, tích đồng ý] --> B[POST /api/assistant/teacher-ops]
+  B --> C{Bật AI, profiles là giáo viên, còn lượt?}
+  C -->|Không| X[503 / 403 / 429, không gọi OpenAI]
+  C -->|Có| D[Gán mã HS1, HS2… cho học sinh của GV; che tên đầy đủ trong câu hỏi và lịch sử]
+  D --> E[OpenAI chọn tool hoặc trả lời]
+  E -->|Tool| F[API chạy tool bằng id GV từ phiên: ngày, tìm HS, lịch, số buổi]
+  F -->|Kết quả chỉ chứa mã| E
+  E -->|Tool lạ, tham số sai, quá 4 vòng| Y[502, không trả gì]
+  E -->|Câu trả lời| G[API đổi mã về tên thật rồi trả cho web]
+```
+
+Không có tool ghi: tạo/sửa/hủy buổi, lịch, tài khoản vẫn qua biểu mẫu. Thẻ xác nhận, audit và idempotency cho thao tác ghi là M1b.2. Xem [assistant.md](assistant.md).
+
+## 8f. Nộp ảnh bài làm và OCR bằng Gemini (M2.1)
+
+```mermaid
+flowchart TD
+  A[GV giao bài: POST /api/assignments] --> B[HS chọn ảnh, web vẽ lại qua canvas: xoay đúng, ≤ 2000 px, JPEG]
+  B --> C[POST /api/assignments/:id/submissions ảnh đầu, /api/submissions/:id/files ảnh sau]
+  C --> D{API: đúng HS, chưa trả bài, JPEG/PNG/WebP, ≤ giới hạn}
+  D -->|Không| X[404 / 409 / 413 / 422]
+  D -->|Có| E[Gỡ EXIF/GPS, lưu submissions/HS/bài/…; HS bị xóa giữa chừng thì xóa ảnh vừa lưu]
+  E --> F[GV mở bài nộp: ảnh qua URL ký 10 phút, Storage RLS]
+  F --> G[GV bấm Đọc bài bằng AI]
+  G --> H{Bật OCR, GV của HS, phụ huynh đã đồng ý, còn lượt?}
+  H -->|Không| Y[503 / 404 / 409 / 429, không gửi ảnh]
+  H -->|Có| I[Gỡ metadata lần nữa → Gemini chép chữ/LaTeX, không giải, không chấm]
+  I -->|Lỗi, bị chặn, bị cắt| Z[502, không lưu]
+  I --> J[Lưu submission_transcripts, chỉ GV đọc; bài nộp → reviewing]
+  J --> K[GV nhập nhận xét, điểm → trả bài; HS thấy nhận xét và điểm]
+```
+
+Trình duyệt chỉ đọc `assignments`, `submissions`, `submission_files`, `submission_transcripts` và ảnh trong giới hạn RLS (0011). Xem [assistant.md](assistant.md).
+
 ## 9. Lộ trình các giai đoạn
 
 ```mermaid

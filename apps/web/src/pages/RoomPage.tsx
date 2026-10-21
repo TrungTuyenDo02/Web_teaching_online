@@ -156,7 +156,7 @@ export default function RoomPage() {
         {/* Tablet (mode=board) không có token video: không tải, không kết nối LiveKit */}
         {join.livekit && (
           <Suspense fallback={<div className="room__video" />}>
-            <VideoPanel url={join.livekit.url} token={join.livekit.token} onRoomClosed={onRoomClosed} />
+            <VideoPanel url={join.livekit.url} token={join.livekit.token} peerLabel={isTeacher ? t("Học sinh") : t("Thầy cô")} onRoomClosed={onRoomClosed} />
           </Suspense>
         )}
       </div>

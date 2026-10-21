@@ -1,4 +1,5 @@
 import { t } from "../lib/i18n";
+import { Badge, type BadgeTone } from "./Badge";
 
 const LABEL: Record<string, string> = {
   scheduled: "Sắp học",
@@ -8,7 +9,7 @@ const LABEL: Record<string, string> = {
   no_show: "Vắng",
 };
 
-const TONE: Record<string, string> = {
+const TONE: Record<string, BadgeTone> = {
   scheduled: "scheduled",
   live: "live",
   completed: "done",
@@ -18,5 +19,5 @@ const TONE: Record<string, string> = {
 
 /** Nhãn trạng thái buổi học: có chữ, không chỉ dựa vào màu. */
 export function SessionStatus({ status }: { status: string }) {
-  return <span className={`badge badge--${TONE[status] ?? "scheduled"}`}>{LABEL[status] ? t(LABEL[status]) : status}</span>;
+  return <Badge tone={TONE[status] ?? "scheduled"}>{LABEL[status] ? t(LABEL[status]) : status}</Badge>;
 }

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.routers import (
+    assignments,
     assistant,
     health,
     me,
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(assistant.router)
+    app.include_router(assignments.router)
     app.include_router(me.router)
     app.include_router(sessions.router)
     app.include_router(students.router)

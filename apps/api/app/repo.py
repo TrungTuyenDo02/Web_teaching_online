@@ -12,11 +12,16 @@ from app.assistant_models import AssistantMaterial, MaterialInput
 from app.config import Settings, get_settings
 from app.core import time as clock
 from app.models import (
+    AssignmentRow,
     DeviceMode,
     Profile,
     SessionRow,
     SessionStatus,
     StudentRow,
+    SubmissionFileRow,
+    SubmissionRow,
+    SubmissionStatus,
+    SubmissionTranscript,
     TeachingNoteRequest,
     TeachingRecord,
     TeachingTopic,
@@ -220,6 +225,48 @@ class Repository(Protocol):
         """Gắn tài khoản vào học sinh nếu học sinh chưa có tài khoản; False nếu đã có."""
         ...
 
+    async def list_teacher_sessions(
+        self, teacher_id: str, start: datetime, end: datetime
+    ) -> list[SessionRow]:
+        """Buổi của giáo viên có scheduled_start trong [start, end), theo giờ bắt đầu."""
+        ...
+
+    # ---------- Bài tập, bài nộp, OCR (0011) ----------
+    async def insert_assignment(self, fields: dict[str, Any]) -> AssignmentRow: ...
+
+    async def get_assignment(self, assignment_id: str) -> AssignmentRow | None: ...
+
+    async def update_assignment(
+        self, assignment_id: str, fields: dict[str, Any]
+    ) -> AssignmentRow | None: ...
+
+    async def insert_submission(self, fields: dict[str, Any]) -> SubmissionRow: ...
+
+    async def get_submission(self, submission_id: str) -> SubmissionRow | None: ...
+
+    async def update_submission(
+        self,
+        submission_id: str,
+        fields: dict[str, Any],
+        expected_status: SubmissionStatus | None = None,
+    ) -> SubmissionRow | None:
+        """Đổi trạng thái theo trạng thái vừa đọc (None: yêu cầu khác đã ghi trước)."""
+        ...
+
+    async def list_submission_files(self, submission_id: str) -> list[SubmissionFileRow]: ...
+
+    async def insert_submission_file(self, fields: dict[str, Any]) -> SubmissionFileRow: ...
+
+    async def upload_submission_object(self, path: str, data: bytes, mime: str) -> None:
+        """Tải ảnh (đã gỡ metadata) vào bucket submissions, không ghi đè."""
+        ...
+
+    async def download_submission_object(self, path: str) -> bytes: ...
+
+    async def delete_submission_object(self, path: str) -> None: ...
+
+    async def insert_transcript(self, fields: dict[str, Any]) -> SubmissionTranscript: ...
+
 
 class SupabaseRepository:
     """Gọi PostgREST của Supabase bằng khóa service role (bỏ qua RLS: kiểm tra quyền ở router)."""
@@ -306,6 +353,113 @@ class SupabaseRepository:
                 if not page:
                     return rows
                 rows.extend(page)
+
+    # ---------- Bài tập, bài nộp, OCR (0011) ----------
+    async def _insert_row(self, table: str, fields: dict[str, Any]) -> dict[str, Any]:
+        headers = self._headers | {"Prefer": "return=representation"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{self._base}/{table}", json=_jsonable(fields), headers=headers
+            )
+            resp.raise_for_status()
+        return resp.json()[0]
+
+    async def _patch_rows(
+        self, table: str, params: dict[str, str], fields: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        headers = self._headers | {"Prefer": "return=representation"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.patch(
+                f"{self._base}/{table}", params=params, json=_jsonable(fields), headers=headers
+            )
+            resp.raise_for_status()
+        return resp.json()
+
+    async def insert_assignment(self, fields: dict[str, Any]) -> AssignmentRow:
+        return AssignmentRow.model_validate(await self._insert_row("assignments", fields))
+
+    async def get_assignment(self, assignment_id: str) -> AssignmentRow | None:
+        row = await self._select_one("assignments", id=assignment_id)
+        return AssignmentRow.model_validate(row) if row else None
+
+    async def update_assignment(
+        self, assignment_id: str, fields: dict[str, Any]
+    ) -> AssignmentRow | None:
+        rows = await self._patch_rows("assignments", {"id": f"eq.{assignment_id}"}, fields)
+        return AssignmentRow.model_validate(rows[0]) if rows else None
+
+    async def insert_submission(self, fields: dict[str, Any]) -> SubmissionRow:
+        return SubmissionRow.model_validate(await self._insert_row("submissions", fields))
+
+    async def get_submission(self, submission_id: str) -> SubmissionRow | None:
+        row = await self._select_one("submissions", id=submission_id)
+        return SubmissionRow.model_validate(row) if row else None
+
+    async def update_submission(
+        self,
+        submission_id: str,
+        fields: dict[str, Any],
+        expected_status: SubmissionStatus | None = None,
+    ) -> SubmissionRow | None:
+        params = {"id": f"eq.{submission_id}"}
+        if expected_status:
+            params["status"] = f"eq.{expected_status}"  # một câu UPDATE ... WHERE: nguyên tử
+        rows = await self._patch_rows("submissions", params, fields)
+        return SubmissionRow.model_validate(rows[0]) if rows else None
+
+    async def list_submission_files(self, submission_id: str) -> list[SubmissionFileRow]:
+        rows = await self._pages(
+            "submission_files",
+            {
+                "submission_id": f"eq.{submission_id}",
+                "select": "*",
+                "order": "created_at.asc,id.asc",
+            },
+        )
+        return [SubmissionFileRow.model_validate(r) for r in rows]
+
+    async def insert_submission_file(self, fields: dict[str, Any]) -> SubmissionFileRow:
+        return SubmissionFileRow.model_validate(await self._insert_row("submission_files", fields))
+
+    async def upload_submission_object(self, path: str, data: bytes, mime: str) -> None:
+        headers = self._headers | {"Content-Type": mime, "x-upsert": "false"}
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{self._storage}/submissions/{path}", content=data, headers=headers
+            )
+            resp.raise_for_status()
+
+    async def download_submission_object(self, path: str) -> bytes:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(f"{self._storage}/submissions/{path}", headers=self._headers)
+            resp.raise_for_status()
+        return resp.content
+
+    async def delete_submission_object(self, path: str) -> None:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.delete(f"{self._storage}/submissions/{path}", headers=self._headers)
+            if resp.status_code not in (200, 204, 400, 404):  # đã không còn: coi là xong
+                resp.raise_for_status()
+
+    async def insert_transcript(self, fields: dict[str, Any]) -> SubmissionTranscript:
+        row = await self._insert_row("submission_transcripts", fields)
+        return SubmissionTranscript.model_validate(row)
+
+    async def list_teacher_sessions(
+        self, teacher_id: str, start: datetime, end: datetime
+    ) -> list[SessionRow]:
+        rows = await self._pages(
+            "sessions",
+            {
+                "teacher_id": f"eq.{teacher_id}",
+                "select": "*",
+                "and": (
+                    f"(scheduled_start.gte.{start.isoformat()},scheduled_start.lt.{end.isoformat()})"
+                ),
+                "order": "scheduled_start.asc,id.asc",
+            },
+        )
+        return [SessionRow.model_validate(row) for row in rows]
 
     async def list_weekly_slots(self, teacher_id: str) -> list[WeeklySlot]:
         rows = await self._pages(

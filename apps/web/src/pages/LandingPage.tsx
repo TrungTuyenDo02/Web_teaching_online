@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { brand } from "../brand";
 import { t } from "../lib/i18n";
+import { Badge } from "../ui/Badge";
 import { ButtonLink } from "../ui/Button";
 import { Decor, DecorLayer } from "../ui/Decor";
 import { LangSwitch } from "../ui/LangSwitch";
@@ -64,9 +65,9 @@ export default function LandingPage() {
       <main id="main" className="page">
         <section className="landing__hero" aria-labelledby="landing-title">
           <div className="landing__intro">
-            <p className="badge badge--live">
+            <Badge tone="live">
               <Decor type="sparkle" size={14} /> {t("Gia sư trực tuyến 1-1")}
-            </p>
+            </Badge>
             <h1 id="landing-title" className="landing__title">
               {t("Học cùng thầy cô, như ngồi cạnh nhau")}
             </h1>

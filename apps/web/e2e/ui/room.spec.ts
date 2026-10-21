@@ -147,3 +147,19 @@ test("END-01 kết thúc còn việc chờ: không báo xong khi server còn pen
   expect(bodies).toHaveLength(3);
   expect(bodies[0]).toMatchObject({ summary: "Giải phương trình bậc nhất" });
 });
+
+test("ROOM-06 phòng học có bảng, ô người kia và ô của mình; không có hình thì hiện chibi, thử camera chỉ trên máy", async ({ page, openPreview }) => {
+  await openPreview(page, "teacher", "/room/u1?mode=main");
+  await expect(page.getByRole("region", { name: "Bảng viết" })).toBeVisible();
+  const video = page.getByRole("region", { name: "Video" });
+  const peer = video.getByRole("figure", { name: /Học sinh/ });
+  const self = video.getByRole("figure", { name: /^Bạn/ });
+  await expect(peer.locator(".video-tile__chibi")).toBeVisible();
+  await expect(self).toContainText("tắt camera");
+  await expect(self.locator(".video-tile__chibi")).toBeVisible();
+  await video.getByRole("button", { name: "Thử camera" }).click();
+  await expect.poll(() => self.locator("video").evaluate((v: HTMLVideoElement) => v.videoWidth)).toBeGreaterThan(0);
+  await expect(self.locator(".video-tile__chibi")).toHaveCount(0);
+  await video.getByRole("button", { name: "Tắt camera" }).click();
+  await expect(self.locator(".video-tile__chibi")).toBeVisible();
+});

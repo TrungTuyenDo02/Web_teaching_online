@@ -11,7 +11,7 @@
  */
 import { useMemo, type ReactNode } from "react";
 import { AuthContext, type AuthState } from "../auth/AuthProvider";
-import type { Backend, PastSession, SessionItem, Student } from "../lib/data";
+import type { AssignmentItem, Backend, PastSession, SessionItem, Student } from "../lib/data";
 import { setBackend } from "../lib/data";
 import type { TeachingRecord, TeachingTopic, WeeklySlot } from "../lib/api";
 
@@ -53,11 +53,28 @@ function seed() {
     { ...past("h2", "s2", 3, "Hàm số bậc nhất", "Vẽ đồ thị y = ax + b", "Vẽ 3 đồ thị trong phiếu", true), student_id: "s2" },
     { ...past("h3", "s1", 9, "Nhân đa thức", "Nhân đơn thức với đa thức", null, false), student_id: "s1" },
   ];
-  return { students, sessions, history, topics: [{ id: "preview-topic-1", name: "Phương trình", grade: "9" }] as TeachingTopic[], privateNotes: {} as Record<string, TeachingRecord>, slots: [] as WeeklySlot[], slotSessions: {} as Record<string, string[]>, emails: new Set(["daco@example.com"]), deleteTries: new Set<string>(), endTries: new Set<string>() };
+  // Bài tập: một bài chưa nộp, một bài đã nộp (ảnh mẫu), một bài đã trả
+  const assignment = (id: string, studentId: string, title: string, description: string, status: AssignmentItem["status"], daysAgo: number): AssignmentItem => ({
+    id, student_id: studentId, student_name: name(studentId), title, description, due_at: at(60 * 24 * 3), status,
+    created_at: at(-60 * 24 * daysAgo), submissions: [],
+  });
+  const assignments: AssignmentItem[] = [
+    assignment("a1", "s1", "Bài 1–5 trang 19", "Phân tích đa thức thành nhân tử", "assigned", 2),
+    { ...assignment("a2", "s1", "Phiếu luyện phương trình", "Giải và thử lại nghiệm", "submitted", 4),
+      submissions: [{ id: "sub-a2", student_id: "s1", assignment_id: "a2", status: "submitted", submitted_at: at(-60 * 20), teacher_comment: null, score: null, returned_at: null,
+        files: [{ id: "f-a2", submission_id: "sub-a2", storage_path: "sample:bai-lam", mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
+    { ...assignment("a3", "s2", "Vẽ 3 đồ thị", "Hàm số bậc nhất trong phiếu", "returned", 6),
+      submissions: [{ id: "sub-a3", student_id: "s2", assignment_id: "a3", status: "returned", submitted_at: at(-60 * 24 * 5), teacher_comment: "Đồ thị đúng, nhớ ghi tên trục.", score: 8.5, returned_at: at(-60 * 24 * 4),
+        files: [{ id: "f-a3", submission_id: "sub-a3", storage_path: "sample:bai-lam", mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
+  ];
+  return { assignments, images: {} as Record<string, string>, students, sessions, history, topics: [{ id: "preview-topic-1", name: "Phương trình", grade: "9" }] as TeachingTopic[], privateNotes: {} as Record<string, TeachingRecord>, slots: [] as WeeklySlot[], slotSessions: {} as Record<string, string[]>, emails: new Set(["daco@example.com"]), deleteTries: new Set<string>(), endTries: new Set<string>() };
 }
 
 const wait = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = <T,>(v: T): T => structuredClone(v);
+
+/** Ảnh bài làm mẫu (SVG, không phải ảnh thật của học sinh). */
+const SAMPLE_WORK = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#fffdf6"/><g stroke="#d6e4f5">' + Array.from({ length: 12 }, (_, i) => `<line x1="0" y1="${30 + i * 32}" x2="600" y2="${30 + i * 32}"/>`).join("") + '</g><g font-family="Comic Sans MS, cursive" font-size="30" fill="#1b2a6b"><text x="40" y="80">Bài 2: 2x + 3 = 11</text><text x="80" y="150">2x = 11 − 3 = 8</text><text x="80" y="220">x = 8 : 2 = 4</text><text x="40" y="300">Thử lại: 2·4 + 3 = 11 ✓</text></g></svg>')}`;
 
 /** Bảng mẫu cho "Xem lại bảng": vài hình đơn giản. */
 const SAMPLE_BOARD = [
@@ -139,6 +156,7 @@ function previewBackend(role: PreviewRole): Backend {
   return {
     async assistantStatus() { return { enabled: false, student_lessons: false, daily_limit: 20 }; },
     async askAssistant() { throw new Error("Trợ lý AI chưa được bật hoặc cấu hình."); },
+    async askTeacherOps() { throw new Error("Trợ lý AI chưa được bật hoặc cấu hình."); },
     async listAssistantMaterials() { teacherOnly(); return []; },
     async getAssistantMaterial() { throw new Error("Không tìm thấy tài liệu"); },
     async createAssistantMaterial() { throw new Error("Chế độ xem trước không lưu tài liệu."); },
@@ -154,6 +172,59 @@ function previewBackend(role: PreviewRole): Backend {
       const slot: WeeklySlot = { id: crypto.randomUUID(), student_id: st.id, weekday: body.weekday, start_time: body.start_time, duration_minutes: body.duration_minutes, subject: body.subject || null, topic: null, starts_on: body.starts_on || today, active: true };
       db.slots.push(slot);
       return { slot: clone(slot), ...fillSlot(slot) };
+    },
+    async listAssignments() {
+      await wait();
+      return clone(mine(db.assignments));
+    },
+    async submissionImageUrl(path) {
+      // Ảnh mẫu vẽ bằng SVG; ảnh vừa chọn trong lúc xem trước giữ bằng URL blob của trình duyệt
+      return db.images[path] ?? SAMPLE_WORK;
+    },
+    async createAssignment(body) {
+      teacherOnly(); await wait();
+      const st = student(body.student_id);
+      if (!st.active) throw new Error("Không tìm thấy học sinh");
+      const row: AssignmentItem = { id: crypto.randomUUID(), student_id: st.id, student_name: st.full_name, title: body.title, description: body.description || null, due_at: body.due_at, status: "assigned", created_at: new Date().toISOString(), submissions: [] };
+      db.assignments.unshift(row);
+      const { student_name: _n, submissions: _s, ...plain } = row;
+      return clone(plain);
+    },
+    async submitAssignment(assignmentId, image) {
+      await wait();
+      const a = mine(db.assignments).find((x) => x.id === assignmentId);
+      if (!a || role !== "student") throw new Error("Không tìm thấy bài tập");
+      if (a.status === "returned") throw new Error("Bài này thầy cô đã chấm và trả, không nộp thêm được.");
+      const id = crypto.randomUUID();
+      const path = `${a.student_id}/${id}/1.jpg`;
+      db.images[path] = URL.createObjectURL(image);
+      const sub = { id, student_id: a.student_id, assignment_id: a.id, status: "submitted" as const, submitted_at: new Date().toISOString(), teacher_comment: null, score: null, returned_at: null };
+      a.submissions.unshift({ ...sub, files: [{ id: crypto.randomUUID(), submission_id: id, storage_path: path, mime_type: image.type, size_bytes: image.size }], transcripts: [] });
+      a.status = "submitted";
+      return clone(sub);
+    },
+    async addSubmissionImage(submissionId, image) {
+      await wait();
+      const sub = mine(db.assignments).flatMap((a) => a.submissions).find((s) => s.id === submissionId);
+      if (!sub || role !== "student") throw new Error("Không tìm thấy bài nộp");
+      if (sub.files.length >= 6) throw new Error("Mỗi bài nộp tối đa 6 ảnh.");
+      const path = `${sub.student_id}/${sub.id}/${sub.files.length + 1}.jpg`;
+      db.images[path] = URL.createObjectURL(image);
+      const file = { id: crypto.randomUUID(), submission_id: sub.id, storage_path: path, mime_type: image.type, size_bytes: image.size };
+      sub.files.push(file);
+      return clone(file);
+    },
+    // Không giả kết quả AI: xem trước không gọi Gemini
+    async ocrSubmission() { teacherOnly(); await wait(); throw new Error("Đọc bài bằng AI chưa được bật hoặc cấu hình."); },
+    async returnSubmission(submissionId, body) {
+      teacherOnly(); await wait();
+      const a = db.assignments.find((x) => x.submissions.some((s) => s.id === submissionId));
+      const sub = a?.submissions.find((s) => s.id === submissionId);
+      if (!a || !sub) throw new Error("Không tìm thấy bài nộp");
+      Object.assign(sub, { status: "returned", teacher_comment: body.teacher_comment || null, score: body.score, returned_at: new Date().toISOString() });
+      a.status = "returned";
+      const { files: _f, transcripts: _t, ...plain } = sub;
+      return clone(plain);
     },
     async stopWeeklySlot(slotId) {
       teacherOnly();

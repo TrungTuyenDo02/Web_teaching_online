@@ -28,6 +28,17 @@ def test_config_issues_names_only():
     ]
 
 
+def test_config_issues_ai_enabled_without_key_or_model():
+    settings = make_settings().model_copy(
+        update={"assistant_enabled": True, "openai_api_key": "k", "ocr_enabled": True}
+    )
+    assert preflight.config_issues(settings) == [
+        "OPENAI_CHAT_MODEL thiếu (ASSISTANT_ENABLED=true)",
+        "GEMINI_API_KEY thiếu (OCR_ENABLED=true)",
+        "GEMINI_OCR_MODEL thiếu (OCR_ENABLED=true)",
+    ]
+
+
 def test_run_reports_missing_migrations_without_secrets(monkeypatch, capsys):
     settings = make_settings().model_copy(update={"supabase_jwt_secret": ""})
 

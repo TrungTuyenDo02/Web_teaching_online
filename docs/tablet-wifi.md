@@ -105,6 +105,10 @@ Remove-NetFirewallRule -DisplayName "Gia su - bang thu qua Wi-Fi"
 
 **Lần chuẩn bị 2026-10-20:** máy chủ thử đã chạy và kiểm từ laptop (Wi-Fi Qualcomm QCA9377, IP `192.168.1.9/24`, mạng Public; `WEB_PORT=5174` vì 5173 đang có Vite khác; 8788 chỉ `127.0.0.1`, 5174/8789/8790 chỉ `192.168.1.9`; trang 200, cấp token không Origin 403, thiếu mã 401). Chủ dự án tạm dừng trước khi mở trên tablet: **chưa có kết quả thiết bị thật, cả 16 mục Chưa thử**; chưa ghi thông tin thiết bị. Lần sau chạy lại hai lệnh (mã ghép nối mới) và điền bảng dưới.
 
+**Lần thử 2026-10-21 (chủ dự án phản hồi):** môi trường LAN tại `192.168.11.140:5173`; tablet đã hiện "Bảng đã kết nối". Sau bước hướng dẫn viết và nhìn nét trên laptop, chủ dự án báo "nét khá ổn, hơi mờ chút, độ trễ chấp nhận được". Đây là nhận xét chủ quan, chưa đo độ trễ; chưa xác định nét mờ trên tablet hay laptop, chưa ghi mẫu tablet/bút. Chưa xác nhận tì tay, mất mạng/gửi bù, ngủ máy hoặc buổi thử dài; không coi toàn checklist đã đạt.
+
+**Bổ sung 2026-10-22:** sau hướng dẫn đặt lòng bàn tay lên màn hình và viết bằng bút, chủ dự án xác nhận "không có nét thừa". Sau bước tắt Wi-Fi tablet, viết thêm rồi bật lại mà không tải lại trang, chủ dự án xác nhận tự kết nối và nét hiện trên laptop. Sau bước khóa màn hình khoảng 1 phút rồi mở, chủ dự án xác nhận bảng cũ còn và nét mới hiện trên laptop. Kết thúc vòng thử nhanh theo đề nghị chủ dự án. Chưa đo thời gian phát hiện/nối lại hoặc xác nhận số thiết bị, cuộn/zoom ngoài ý muốn; độ hơi mờ còn mở, buổi dài và toàn luồng phòng học thật vẫn chờ nghiệm thu.
+
 Ghi lại trước khi thử:
 
 | Mục | Giá trị |
@@ -124,13 +128,13 @@ Kết quả: điền Đạt / Không đạt / Chưa thử và ghi chú (lỗi th
 | 1 | Tablet: giáo viên. Laptop: học sinh, cùng `dev-1` | Hai máy "Bảng đã kết nối · 2 thiết bị"; laptop ghi "Chỉ xem" | | |
 | 2 | Viết chậm bằng bút (chữ, số) | Nét mượt, không đứt; hiện trên laptop trong khoảng 1 giây | | |
 | 3 | Viết nhanh (gạch, ký liên tục, nhiều nét liền) | Không mất nét, không nét lạ; laptop hội tụ đủ | | |
-| 4 | Tì lòng bàn tay lên màn hình khi viết | Không sinh nét lạ (bật "Pen mode" của Excalidraw nếu chưa tự bật: nút bút ở đầu thanh công cụ) | | |
+| 4 | Tì lòng bàn tay lên màn hình khi viết | Không sinh nét lạ (bật "Pen mode" của Excalidraw nếu chưa tự bật: nút bút ở đầu thanh công cụ) | Đạt theo phản hồi | 2026-10-22: chủ dự án xác nhận không có nét thừa |
 | 5 | Ngón tay: kéo để cuộn, chụm hai ngón để zoom | Cuộn/zoom, không vẽ bằng ngón tay khi đang ở Pen mode | | |
 | 6 | Chọn nét (công cụ chọn) rồi xóa; dùng tẩy (Eraser) | Nét mất ở cả laptop | | |
 | 7 | Xoay dọc ↔ ngang | Bảng không mất nét; thanh công cụ Excalidraw và bảng thuộc tính nét không che chỗ đang viết (ghi lại nếu che) | | |
 | 8 | Tắt Wi-Fi tablet, viết tiếp 2–3 nét | Tablet báo "Mất kết nối, đang thử lại" trong khoảng 15 giây; laptop thấy "1 thiết bị" trong khoảng 30 giây | | |
-| 9 | Bật lại Wi-Fi | Tablet nối lại, nét viết lúc mất mạng hiện trên laptop (gửi bù); hai máy "2 thiết bị" | | |
-| 10 | Khóa màn hình tablet 1–2 phút, mở lại | "Đang kiểm tra kết nối bảng…" rồi "Bảng đã kết nối"; viết tiếp được, laptop nhận | | |
+| 9 | Bật lại Wi-Fi | Tablet nối lại, nét viết lúc mất mạng hiện trên laptop (gửi bù); hai máy "2 thiết bị" | Tự nối và gửi bù đạt theo phản hồi | 2026-10-22: chủ dự án xác nhận; chưa đo thời gian hoặc xác nhận số thiết bị |
+| 10 | Khóa màn hình tablet 1–2 phút, mở lại | "Đang kiểm tra kết nối bảng…" rồi "Bảng đã kết nối"; viết tiếp được, laptop nhận | Phục hồi và đồng bộ đạt theo phản hồi | 2026-10-22: chủ dự án xác nhận bảng còn, nét mới hiện trên laptop; chưa đo thời gian/ghi riêng nhãn trạng thái |
 | 11 | Chuyển sang ứng dụng khác 1–2 phút rồi quay lại Chrome | Như mục 10 | | |
 | 12 | "Tải ảnh bảng" trên tablet, mở ảnh trong Thư viện/Files | Có tệp PNG, đúng các nét (Chrome có thể cảnh báo tải xuống không an toàn: chọn Giữ lại; ghi lại) | | |
 | 13 | Đổi chiều: laptop giáo viên viết bằng chuột, tablet học sinh | Tablet thấy nét, không vẽ được, "Chỉ xem" | | |

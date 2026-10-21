@@ -7,6 +7,7 @@ import { AppShell } from "../ui/AppShell";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Alert, Empty, ErrorState, Loading } from "../ui/Feedback";
+import { PageHeader } from "../ui/PageHeader";
 import { Window } from "../ui/Window";
 import { t } from "../lib/i18n";
 
@@ -58,9 +59,7 @@ export default function MonthlyReportPage() {
   if (user?.role !== "teacher") return <AppShell title={t("Báo cáo tháng")}><Alert>{t("Chỉ giáo viên được xem báo cáo.")}</Alert></AppShell>;
   return (
     <AppShell title={t("Báo cáo tháng")}>
-      <div className="page__head">
-        <div><h1>{t("Báo cáo tháng")}</h1><p className="page__lead">{t("Số buổi đã kết thúc của từng học sinh.")}</p></div>
-      </div>
+      <PageHeader title={t("Báo cáo tháng")} lead={t("Số buổi đã kết thúc của từng học sinh.")} />
       <Field label={t("Tháng báo cáo")} hint={t("Tính theo giờ Việt Nam, dựa trên ngày bắt đầu đã xếp lịch.")}>
         {(control) => <input {...control} type="month" required value={month} onChange={(event) => { if (event.target.value) setMonth(event.target.value); }} />}
       </Field>

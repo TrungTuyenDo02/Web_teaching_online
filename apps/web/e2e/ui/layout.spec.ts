@@ -18,6 +18,7 @@ const PAGES: { role: "teacher" | "student"; path: string; ready: string }[] = [
   { role: "teacher", path: "/history", ready: "Lịch sử buổi học" },
   { role: "teacher", path: "/reports", ready: "Báo cáo tháng" },
   { role: "teacher", path: "/teaching-notes", ready: "Ghi chú riêng" },
+  { role: "teacher", path: "/assignments", ready: "Bài đã giao" },
   { role: "teacher", path: "/room/u1?mode=main", ready: "Phòng học" },
   { role: "teacher", path: "/room/u1?mode=board", ready: "Bảng viết (tablet)" },
   { role: "student", path: "/", ready: "Chào Nguyễn Lan Anh" },

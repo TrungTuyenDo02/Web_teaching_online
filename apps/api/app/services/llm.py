@@ -10,7 +10,12 @@ class LLMUnavailable(Exception):
 
 
 async def respond(
-    settings: Settings, *, instructions: str, messages: list[dict], tools: list[dict] | None = None
+    settings: Settings,
+    *,
+    instructions: str,
+    messages: list[dict],
+    tools: list[dict] | None = None,
+    tool_choice: str = "required",
 ) -> dict:
     payload = {
         "model": settings.openai_chat_model,
@@ -21,7 +26,7 @@ async def respond(
         "max_output_tokens": min(max(settings.assistant_max_output_tokens, 128), 2000),
     }
     if tools:
-        payload.update(tools=tools, tool_choice="required", parallel_tool_calls=False)
+        payload.update(tools=tools, tool_choice=tool_choice, parallel_tool_calls=False)
     try:
         async with httpx.AsyncClient(timeout=35) as client:
             result = await client.post(

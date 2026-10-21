@@ -51,6 +51,25 @@ def config_issues(settings: Settings) -> list[str]:
     issues = [f"{name} thiếu" for name in settings.missing_required()]
     urls = {"SUPABASE_URL": settings.supabase_url, "LIVEKIT_URL": settings.livekit_url}
     issues += [f"{name} còn giá trị mẫu" for name, value in urls.items() if PLACEHOLDER in value]
+    # Bật AI mà thiếu key/model thì API trả 503 mọi lượt: báo sớm, không in giá trị
+    if settings.assistant_enabled:
+        issues += [
+            f"{n} thiếu (ASSISTANT_ENABLED=true)"
+            for n, v in (
+                ("OPENAI_API_KEY", settings.openai_api_key),
+                ("OPENAI_CHAT_MODEL", settings.openai_chat_model),
+            )
+            if not v
+        ]
+    if settings.ocr_enabled:
+        issues += [
+            f"{n} thiếu (OCR_ENABLED=true)"
+            for n, v in (
+                ("GEMINI_API_KEY", settings.gemini_api_key),
+                ("GEMINI_OCR_MODEL", settings.gemini_ocr_model),
+            )
+            if not v
+        ]
     return issues
 
 

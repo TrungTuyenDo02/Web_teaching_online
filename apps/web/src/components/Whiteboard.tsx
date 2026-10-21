@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import "@excalidraw/excalidraw/index.css";
 import { useBoardSync, type BoardActivity, type BoardStatus } from "../hooks/useBoardSync";
 import { lang, t } from "../lib/i18n";
+import { Button } from "../ui/Button";
 
 interface Props {
   url: string;
@@ -72,9 +73,9 @@ export default function Whiteboard({ url, token, readOnly = false, onEnded, onAc
         <span role="status">{t(statusText[status])}</span>
         <span className="muted">· {t("{n} thiết bị", { n: peers })}</span>
         {readOnly && <span className="muted">· {t("Chỉ xem")}</span>}
-        <button type="button" className="btn btn--sm" onClick={() => void downloadPng()} disabled={!api}>
+        <Button size="sm" onClick={() => void downloadPng()} disabled={!api}>
           {t("Tải ảnh bảng")}
-        </button>
+        </Button>
         {exportError && (
           <span role="alert" className="board__error">
             {exportError}

@@ -6,6 +6,7 @@ import { durationMinutes, formatDateTime, formatTime, groupByDay, nextSession, r
 import { Button, ButtonLink } from "../../ui/Button";
 import { ConfirmDialog } from "../../ui/Dialog";
 import { Empty, ErrorState, Loading, useToast } from "../../ui/Feedback";
+import { PageHeader } from "../../ui/PageHeader";
 import { SessionStatus } from "../../ui/SessionStatus";
 import { Window } from "../../ui/Window";
 import { SessionList, sessionTitle } from "../SessionList";
@@ -51,15 +52,15 @@ export default function TeacherHome() {
 
   return (
     <>
-      <div className="page__head">
-        <div>
-          <h1>{t("Chào {name}", { name: user?.name ?? "" })}</h1>
-          <p className="page__lead">{t("Lịch dạy và việc cần làm hôm nay.")}</p>
-        </div>
-        <Button variant="primary" size="lg" onClick={() => setForm("new")}>
-          {t("Tạo buổi học")}
-        </Button>
-      </div>
+      <PageHeader
+        title={t("Chào {name}", { name: user?.name ?? "" })}
+        lead={t("Lịch dạy và việc cần làm hôm nay.")}
+        actions={
+          <Button variant="primary" size="lg" onClick={() => setForm("new")}>
+            {t("Tạo buổi học")}
+          </Button>
+        }
+      />
 
       {sessions.error && <ErrorState message={sessions.error} onRetry={() => void sessions.reload()} />}
 

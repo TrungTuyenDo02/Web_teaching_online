@@ -16,7 +16,7 @@ from app.config import Settings, get_settings
 from app.core import time as clock
 from app.repo import Repository, get_repo
 from app.routers.sessions import require_teacher
-from app.services import assistant, llm
+from app.services import assistant, llm, teacher_ops
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
@@ -67,6 +67,33 @@ async def chat(
         raise HTTPException(502, "Trợ lý AI chưa trả lời được. Hãy thử lại sau.") from None
     except httpx.HTTPError:
         raise HTTPException(503, "Chưa truy xuất được kho tài liệu. Hãy thử lại sau.") from None
+
+
+@router.post("/teacher-ops", response_model=AssistantAnswer)
+async def teacher_ops_chat(
+    body: AssistantQuestion,
+    user: AuthUser = Depends(get_current_user),
+    repo: Repository = Depends(get_repo),
+    settings: Settings = Depends(get_settings),
+):
+    """Teacher-Ops chỉ đọc: lịch, học sinh, số buổi; tên học sinh gửi provider dưới dạng mã."""
+    if not (settings.assistant_enabled and settings.openai_api_key and settings.openai_chat_model):
+        raise HTTPException(503, "Trợ lý AI chưa được bật hoặc cấu hình.")
+    profile = await require_teacher(user, repo, "Chỉ giáo viên được dùng trợ lý lớp học")
+    try:
+        allowed = await repo.reserve_assistant_turn(
+            profile.id,
+            clock.as_vietnam(clock.now_utc()).date(),
+            settings.assistant_daily_user_turns,
+            settings.assistant_daily_total_turns,
+        )
+        if not allowed:
+            raise HTTPException(429, "Đã hết lượt trợ lý AI hôm nay. Hãy thử lại vào ngày mai.")
+        return await teacher_ops.chat(repo, profile, body, settings)
+    except llm.LLMUnavailable:
+        raise HTTPException(502, "Trợ lý AI chưa trả lời được. Hãy thử lại sau.") from None
+    except httpx.HTTPError:
+        raise HTTPException(503, "Chưa đọc được dữ liệu lớp học. Hãy thử lại sau.") from None
 
 
 @router.get("/materials", response_model=list[AssistantMaterial])

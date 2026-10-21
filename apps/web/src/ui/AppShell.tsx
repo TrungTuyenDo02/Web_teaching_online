@@ -14,6 +14,7 @@ const NAV = {
     { to: "/", label: "Trang chính" },
     { to: "/students", label: "Học sinh" },
     { to: "/history", label: "Buổi đã học" },
+    { to: "/assignments", label: "Bài tập" },
     { to: "/reports", label: "Báo cáo tháng" },
     { to: "/teaching-notes", label: "Ghi chú riêng" },
   ],

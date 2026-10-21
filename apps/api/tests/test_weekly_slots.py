@@ -25,8 +25,16 @@ URL = "/api/weekly-slots"
 
 
 @pytest.fixture
-def now(clock):
+def now(clock, repo):
     clock.t = MONDAY_8AM_VN.timestamp()
+    # Buổi mẫu của FakeRepo đặt theo giờ thật: dời theo đồng hồ giả, kẻo chạy test vào tối
+    # thứ Tư nó trùng giờ lịch 19:30 và buổi bị bỏ qua (test chỉ đỏ vào khung giờ đó)
+    repo.sessions[SESSION_ID] = repo.sessions[SESSION_ID].model_copy(
+        update={
+            "scheduled_start": MONDAY_8AM_VN - timedelta(minutes=5),
+            "scheduled_end": MONDAY_8AM_VN + timedelta(minutes=55),
+        }
+    )
     return clock
 
 

@@ -5,6 +5,7 @@ import { formatDateTime } from "../lib/schedule";
 import { AppShell } from "../ui/AppShell";
 import { ButtonLink } from "../ui/Button";
 import { Empty, ErrorState, Loading } from "../ui/Feedback";
+import { PageHeader } from "../ui/PageHeader";
 import { Window } from "../ui/Window";
 import { sessionTitle } from "./SessionList";
 import { t } from "../lib/i18n";
@@ -18,13 +19,11 @@ export default function HistoryPage() {
 
   return (
     <AppShell title={t("Buổi đã học")}>
-      <div className="page__head">
-        <div>
-          <h1>{t("Buổi đã học")}</h1>
-          <p className="page__lead">{teacher ? t("Nội dung đã dạy, bài về nhà và bảng cuối buổi.") : t("Nội dung đã học, bài về nhà và bảng của từng buổi.")}</p>
-        </div>
-        {teacher && <ButtonLink to="/teaching-notes">{t("Ghi chú riêng và chủ đề")}</ButtonLink>}
-      </div>
+      <PageHeader
+        title={t("Buổi đã học")}
+        lead={teacher ? t("Nội dung đã dạy, bài về nhà và bảng cuối buổi.") : t("Nội dung đã học, bài về nhà và bảng của từng buổi.")}
+        actions={teacher && <ButtonLink to="/teaching-notes">{t("Ghi chú riêng và chủ đề")}</ButtonLink>}
+      />
       <Window title={t("Lịch sử buổi học")} file="history.log" variant="lavender">
         {history.error ? (
           <ErrorState message={history.error} onRetry={() => void history.reload()} />

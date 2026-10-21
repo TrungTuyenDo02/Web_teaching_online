@@ -15,6 +15,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import RoomPage from "./pages/RoomPage";
 import StudentsPage from "./pages/StudentsPage";
 import AssistantMaterialsPage from "./pages/AssistantMaterialsPage";
+import AssignmentsPage from "./pages/AssignmentsPage";
 import { Loading } from "./ui/Feedback";
 import { Window } from "./ui/Window";
 
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/history/:sessionId/board" element={<RequireAuth><BoardReviewPage /></RequireAuth>} />
         <Route path="/students" element={<RequireAuth><StudentsPage /></RequireAuth>} />
         <Route path="/reports" element={<RequireAuth><MonthlyReportPage /></RequireAuth>} />
+        <Route path="/assignments" element={<RequireAuth><AssignmentsPage /></RequireAuth>} />
         <Route path="/teaching-notes" element={<RequireAuth><TeachingNotesPage /></RequireAuth>} />
         <Route path="/assistant-materials" element={<RequireAuth><AssistantMaterialsPage /></RequireAuth>} />
         <Route path="/assistant-materials/:materialId" element={<RequireAuth><AssistantMaterialsPage /></RequireAuth>} />

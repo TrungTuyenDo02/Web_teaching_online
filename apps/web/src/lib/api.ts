@@ -202,6 +202,24 @@ export type AssistantMaterialInput = Pick<AssistantMaterial, "topic_id" | "title
 export const assistantStatus = () => apiFetch<AssistantStatus>("/api/assistant/status");
 export const askAssistant = (body: { question: string; language: "vi" | "en"; consent: true; history: { question: string; answer: string }[] }, signal?: AbortSignal) =>
   apiFetch<AssistantAnswer>("/api/assistant/chat", { method: "POST", body: JSON.stringify(body), signal });
+// ---------- Bài tập, bài nộp, OCR (0011: mọi thao tác ghi qua API) ----------
+export interface Assignment { id: string; student_id: string; title: string; description: string | null; due_at: string | null; status: "assigned" | "submitted" | "returned"; created_at: string }
+export interface Submission { id: string; student_id: string; assignment_id: string | null; status: "submitted" | "reviewing" | "returned"; submitted_at: string; teacher_comment: string | null; score: number | null; returned_at: string | null }
+export interface SubmissionFile { id: string; submission_id: string; storage_path: string; mime_type: string | null; size_bytes: number | null }
+export interface Transcript { id: string; submission_id: string; model: string; content: string; created_at: string }
+export interface AssignmentInput { student_id: string; title: string; description: string; due_at: string | null }
+export const createAssignment = (body: AssignmentInput) => apiFetch<Assignment>("/api/assignments", { method: "POST", body: JSON.stringify(body) });
+// Ảnh gửi thô (đã vẽ lại qua canvas ở lib/imagePrep.ts); API kiểm chữ ký file và gỡ metadata lần nữa
+const imageInit = (image: Blob): RequestInit => ({ method: "POST", body: image, headers: { "Content-Type": image.type || "application/octet-stream" } });
+export const submitAssignment = (assignmentId: string, image: Blob) => apiFetch<Submission>(`/api/assignments/${assignmentId}/submissions`, imageInit(image));
+export const addSubmissionImage = (submissionId: string, image: Blob) => apiFetch<SubmissionFile>(`/api/submissions/${submissionId}/files`, imageInit(image));
+export const ocrSubmission = (submissionId: string) => apiFetch<Transcript>(`/api/submissions/${submissionId}/ocr`, { method: "POST" });
+export const returnSubmission = (submissionId: string, body: { teacher_comment: string; score: number | null }) =>
+  apiFetch<Submission>(`/api/submissions/${submissionId}/return`, { method: "POST", body: JSON.stringify(body) });
+
+// Teacher-Ops chỉ đọc: lịch, học sinh, số buổi; API gửi tên học sinh cho provider dưới dạng mã
+export const askTeacherOps = (body: Parameters<typeof askAssistant>[0], signal?: AbortSignal) =>
+  apiFetch<AssistantAnswer>("/api/assistant/teacher-ops", { method: "POST", body: JSON.stringify(body), signal });
 export const listAssistantMaterials = () => apiFetch<AssistantMaterial[]>("/api/assistant/materials");
 export const getAssistantMaterial = (id: string) => apiFetch<AssistantMaterial>(`/api/assistant/materials/${id}`);
 export const createAssistantMaterial = (body: AssistantMaterialInput) => apiFetch<AssistantMaterial>("/api/assistant/materials", { method: "POST", body: JSON.stringify(body) });

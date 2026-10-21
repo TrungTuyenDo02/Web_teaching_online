@@ -20,12 +20,17 @@ from app.assistant_models import AssistantMaterial, MaterialInput  # noqa: E402
 from app.config import Settings, get_settings  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import (  # noqa: E402
+    AssignmentRow,
     DeviceMode,
     Profile,
     Role,
     SessionRow,
     SessionStatus,
     StudentRow,
+    SubmissionFileRow,
+    SubmissionRow,
+    SubmissionStatus,
+    SubmissionTranscript,
     TeachingNoteRequest,
     TeachingRecord,
     TeachingTopic,
@@ -118,6 +123,10 @@ class FakeRepo:
         self.board_files: dict[str, list[dict]] = {}  # đường dẫn trong bucket boards -> nội dung
         self.fail_board_upload = False
         self.submission_files: dict[str, bytes] = {}  # đường dẫn trong bucket submissions
+        self.assignments: dict[str, AssignmentRow] = {}
+        self.submissions: dict[str, SubmissionRow] = {}
+        self.submission_rows: list[SubmissionFileRow] = []
+        self.transcripts: list[SubmissionTranscript] = []
         self.fail_storage_purge = False
         self.upload_intents: dict[str, UploadIntent] = {}
         # Điều khiển thứ tự: save_board_snapshot báo upload_waiting rồi chờ upload_gate
@@ -140,6 +149,82 @@ class FakeRepo:
         self.weekly_slots: dict[str, WeeklySlot] = {}
         self.teaching_records: dict[str, TeachingRecord] = {}
         self.before_save_teaching_record: Callable[[], None] | None = None
+
+    # ---------- Bài tập, bài nộp, OCR (0011) ----------
+    async def insert_assignment(self, fields: dict[str, Any]) -> AssignmentRow:
+        row = AssignmentRow(
+            id=str(uuid.uuid4()), status="assigned", created_at=datetime.now(UTC), **fields
+        )
+        self.assignments[row.id] = row
+        return row
+
+    async def get_assignment(self, assignment_id: str) -> AssignmentRow | None:
+        return self.assignments.get(assignment_id)
+
+    async def update_assignment(
+        self, assignment_id: str, fields: dict[str, Any]
+    ) -> AssignmentRow | None:
+        row = self.assignments.get(assignment_id)
+        if row is None:
+            return None
+        self.assignments[assignment_id] = row.model_copy(update=fields)
+        return self.assignments[assignment_id]
+
+    async def insert_submission(self, fields: dict[str, Any]) -> SubmissionRow:
+        row = SubmissionRow(
+            id=str(uuid.uuid4()), status="submitted", submitted_at=datetime.now(UTC), **fields
+        )
+        self.submissions[row.id] = row
+        return row
+
+    async def get_submission(self, submission_id: str) -> SubmissionRow | None:
+        return self.submissions.get(submission_id)
+
+    async def update_submission(
+        self,
+        submission_id: str,
+        fields: dict[str, Any],
+        expected_status: SubmissionStatus | None = None,
+    ) -> SubmissionRow | None:
+        row = self.submissions.get(submission_id)
+        if row is None or (expected_status and row.status != expected_status):
+            return None
+        self.submissions[submission_id] = row.model_copy(update=fields)
+        return self.submissions[submission_id]
+
+    async def list_submission_files(self, submission_id: str) -> list[SubmissionFileRow]:
+        return [f for f in self.submission_rows if f.submission_id == submission_id]
+
+    async def insert_submission_file(self, fields: dict[str, Any]) -> SubmissionFileRow:
+        row = SubmissionFileRow(id=str(uuid.uuid4()), **fields)
+        self.submission_rows.append(row)
+        return row
+
+    async def upload_submission_object(self, path: str, data: bytes, mime: str) -> None:
+        if path in self.submission_files:
+            raise AssertionError("không ghi đè ảnh bài làm")
+        self.submission_files[path] = data
+
+    async def download_submission_object(self, path: str) -> bytes:
+        return self.submission_files[path]
+
+    async def delete_submission_object(self, path: str) -> None:
+        self.submission_files.pop(path, None)
+
+    async def insert_transcript(self, fields: dict[str, Any]) -> SubmissionTranscript:
+        row = SubmissionTranscript(id=str(uuid.uuid4()), created_at=datetime.now(UTC), **fields)
+        self.transcripts.append(row)
+        return row
+
+    async def list_teacher_sessions(
+        self, teacher_id: str, start: datetime, end: datetime
+    ) -> list[SessionRow]:
+        rows = [
+            s
+            for s in self.sessions.values()
+            if s.teacher_id == teacher_id and start <= s.scheduled_start < end
+        ]
+        return sorted(rows, key=lambda s: (s.scheduled_start, s.id))
 
     async def list_weekly_slots(self, teacher_id: str) -> list[WeeklySlot]:
         mine = [w for w in self.weekly_slots.values() if w.teacher_id == teacher_id]

@@ -61,6 +61,11 @@ export function answerGuide(question: string, role: Role): GuideReply {
   };
 }
 
+/** Câu gợi ý cho Teacher-Ops chỉ đọc. */
+export function opsSuggestions(): string[] {
+  return [t("Tuần này tôi có những buổi nào?"), t("Tháng này mỗi em học mấy buổi?")];
+}
+
 export function guideSuggestions(role: Role): string[] {
   return role === "teacher"
     ? [t("Quản lý học sinh"), t("Xếp lịch học"), t("Xem báo cáo tháng"), t("Viết ghi chú riêng")]

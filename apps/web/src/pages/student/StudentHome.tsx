@@ -4,8 +4,10 @@ import { useAsync, useNow } from "../../lib/hooks";
 import { durationMinutes, formatDateTime, formatTime, groupByDay, nextSession, relativeStart } from "../../lib/schedule";
 import { ButtonLink } from "../../ui/Button";
 import { Empty, ErrorState, Loading } from "../../ui/Feedback";
+import { PageHeader } from "../../ui/PageHeader";
 import { Window } from "../../ui/Window";
 import { SessionList, sessionTitle } from "../SessionList";
+import { StudentAssignments } from "./StudentAssignments";
 import { t } from "../../lib/i18n";
 
 /** Trang chính học sinh: buổi tiếp theo + nút vào lớp, buổi sắp học, bài về nhà gần nhất. */
@@ -23,12 +25,7 @@ export default function StudentHome() {
 
   return (
     <>
-      <div className="page__head">
-        <div>
-          <h1>{t("Chào {name}", { name: user?.name ?? "" })}</h1>
-          <p className="page__lead">{t("Lịch học của em và bài về nhà.")}</p>
-        </div>
-      </div>
+      <PageHeader title={t("Chào {name}", { name: user?.name ?? "" })} lead={t("Lịch học của em và bài về nhà.")} />
 
       {sessions.error && <ErrorState message={sessions.error} onRetry={() => void sessions.reload()} />}
 
@@ -63,6 +60,7 @@ export default function StudentHome() {
               <SessionList items={rest} now={now} teacher={false} />
             </Window>
           )}
+          <StudentAssignments />
         </div>
 
         <Window title={t("Bài về nhà gần nhất")} file="homework.txt" variant="peach">

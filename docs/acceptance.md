@@ -93,19 +93,19 @@ Máy chủ bảng: thư mục `data/boards` (Docker: volume `board-data`) giữ 
 
 Thiết bị: laptop GV (camera, micro), tablet Android có bút, một máy học sinh (điện thoại hoặc laptop khác). Ghi model tablet, phiên bản Android, trình duyệt (Chrome) và phiên bản.
 
-Thử trước bằng dữ liệu giả, chưa cần Supabase/LiveKit: [tablet-wifi.md](tablet-wifi.md) (laptop + tablet cùng Wi-Fi, có bảng ghi kết quả). 2026-10-20: đã chuẩn bị máy chủ thử trên Wi-Fi, tạm dừng trước khi thử tablet; 16 mục **Chưa thử**.
+Thử trước bằng dữ liệu giả, chưa cần Supabase/LiveKit: [tablet-wifi.md](tablet-wifi.md) (laptop + tablet cùng Wi-Fi, có bảng ghi kết quả). Cập nhật 2026-10-22, theo phản hồi chủ dự án trên bảng thử LAN: nét khá ổn, độ trễ chấp nhận được; tì tay không sinh nét thừa; mất Wi-Fi tự nối/gửi bù; khóa màn hình rồi mở, bảng còn và nét mới đồng bộ. Vòng thử nhanh kết thúc; nét hơi mờ chưa xác định màn hình/nguyên nhân. Chưa nghiệm thu buổi 45–60 phút hoặc toàn luồng có Supabase/LiveKit; không coi cả 16 mục đã đạt.
 
 ### 4.1 Tablet (trước buổi thử, 10–15 phút)
 
 | # | Kiểm | Kỳ vọng | Kết quả |
 |---|------|---------|---------|
 | T1 | Mở "Dùng tablet" trên Chrome Android | Chỉ có bảng, không xin quyền camera/micro | Chưa thử |
-| T2 | Viết chữ tiếng Việt có dấu, công thức nhỏ bằng bút | Nét liền, không trễ thấy rõ, không mất đầu nét | Chưa thử |
-| T3 | Đặt lòng bàn tay lên màn hình khi viết | Không vẽ thêm vệt lạ, không cuộn/zoom bảng | Chưa thử |
+| T2 | Viết chữ tiếng Việt có dấu, công thức nhỏ bằng bút | Nét liền, không trễ thấy rõ, không mất đầu nét | Đã thử bảng LAN: nét khá ổn, hơi mờ, độ trễ chấp nhận được; công thức/đầu nét chưa xác nhận riêng |
+| T3 | Đặt lòng bàn tay lên màn hình khi viết | Không vẽ thêm vệt lạ, không cuộn/zoom bảng | Bảng LAN: không sinh nét thừa theo phản hồi 2026-10-22; cuộn/zoom chưa xác nhận riêng |
 | T4 | Hai ngón cuộn/zoom bảng, rồi viết tiếp | Cuộn được; viết tiếp không lệch vị trí | Chưa thử |
 | T5 | Xoay ngang ↔ dọc khi đang có nét | Bảng không mất nét, không tải lại, nút vẫn bấm được (≥ 44 px) | Chưa thử |
 | T6 | Tẩy, hoàn tác, chọn màu bằng bút/ngón | Dùng được, nút đủ to | Chưa thử |
-| T7 | Tắt màn hình 1 phút, mở lại | Bảng tự nối lại, nét mới vẫn đồng bộ | Chưa thử |
+| T7 | Tắt màn hình 1 phút, mở lại | Bảng tự nối lại, nét mới vẫn đồng bộ | Đạt trên bảng LAN theo phản hồi 2026-10-22: bảng còn, nét mới hiện trên laptop |
 | T8 | Chuyển Wi-Fi ↔ 4G | Nối lại, không mất nét | Chưa thử |
 | T9 | Dán/kéo ảnh vào bảng | Bị chặn, có thông báo tiếng Việt | Chưa thử |
 

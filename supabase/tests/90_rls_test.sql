@@ -23,6 +23,10 @@ insert into public.sessions (teacher_id, student_id, scheduled_start, scheduled_
 insert into public.submissions (id, student_id) values
   ('b0b0b0b0-0000-0000-0000-00000000000b', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
 insert into storage.objects (bucket_id, name) values ('submissions', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/x/bai.jpg');
+-- Từ 0011 ảnh bài làm chỉ do API (service role) tải lên
+insert into storage.objects (bucket_id, name) values ('submissions', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/x/bai.jpg');
+insert into public.submission_transcripts (submission_id, model, content) values
+  ('b0b0b0b0-0000-0000-0000-00000000000b', 'test-ocr', 'x + 1 = 2');
 -- Bảng cuối buổi (bucket boards) của từng học sinh
 insert into storage.objects (bucket_id, name) values
   ('boards', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/s1.json'),
@@ -40,16 +44,24 @@ do $$ begin
   assert (select count(*) from public.submissions) = 0, 'HS A không thấy bài nộp của HS B';
 end $$;
 
--- A nộp bài cho chính mình: được
-insert into public.submissions (student_id) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
-
--- A nộp bài thay B: bị chặn
+-- 0011: nộp bài chỉ qua API (kiểm ảnh, gỡ EXIF): A không tự ghi bài nộp, kể cả của mình
 do $$ begin
+  begin
+    insert into public.submissions (student_id) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    raise exception 'LỖI: HS A ghi bài nộp không qua API';
+  exception when insufficient_privilege then null;
+  end;
   begin
     insert into public.submissions (student_id) values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
     raise exception 'LỖI: HS A nộp bài thay HS B được';
   exception when insufficient_privilege then null;
   end;
+  begin
+    insert into public.assignments (student_id, title) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'tự giao');
+    raise exception 'LỖI: HS A tự giao bài';
+  exception when insufficient_privilege then null;
+  end;
+  assert (select count(*) from public.submission_transcripts) = 0, 'HS A không thấy kết quả OCR';
 end $$;
 
 -- A tự nâng quyền thành giáo viên: bị chặn (không có hàng nào bị đổi hoặc báo lỗi)
@@ -105,9 +117,13 @@ do $$ begin
   end;
 end $$;
 
--- Storage: A tải lên thư mục của mình được, của B thì không
-insert into storage.objects (bucket_id, name) values ('submissions', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/x/bai.jpg');
+-- Storage: 0011 bỏ quyền tải lên của trình duyệt, cả thư mục của mình lẫn của B
 do $$ begin
+  begin
+    insert into storage.objects (bucket_id, name) values ('submissions', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/y/bai.jpg');
+    raise exception 'LỖI: HS A tải ảnh lên không qua API';
+  exception when insufficient_privilege then null;
+  end;
   begin
     insert into storage.objects (bucket_id, name) values ('submissions', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/y/bai.jpg');
     raise exception 'LỖI: HS A tải file vào thư mục của HS B';
@@ -138,10 +154,34 @@ do $$ begin
   assert (select count(*) from public.students) = 2, 'GV thấy 2 học sinh';
   assert (select count(*) from public.profiles) = 3, 'GV thấy 3 profile';
   assert (select count(*) from public.submissions) = 1, 'GV thấy bài nộp';
-  assert (select count(*) from storage.objects where bucket_id = 'submissions') = 1, 'GV thấy file của học sinh mình';
+  assert (select count(*) from storage.objects where bucket_id = 'submissions') = 2, 'GV thấy file của học sinh mình';
+  assert (select count(*) from public.submission_transcripts) = 1, 'GV thấy kết quả OCR bài của học sinh mình';
   assert (select count(*) from storage.objects where bucket_id = 'boards') = 2, 'GV thấy bảng của mọi học sinh mình';
 end $$;
-update public.submissions set status = 'returned', score = 8.5, teacher_comment = 'Tốt' where id = 'b0b0b0b0-0000-0000-0000-00000000000b';
+-- 0011: chấm/trả bài, giao bài, ghi OCR, tải ảnh đều qua API
+do $$ begin
+  begin
+    update public.submissions set status = 'returned', score = 8.5, teacher_comment = 'Tốt' where id = 'b0b0b0b0-0000-0000-0000-00000000000b';
+    raise exception 'LỖI: GV trả bài không qua API';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.assignments (student_id, title) values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'giao thẳng');
+    raise exception 'LỖI: GV giao bài không qua API';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.submission_transcripts (submission_id, model, content)
+    values ('b0b0b0b0-0000-0000-0000-00000000000b', 'gia', 'gia');
+    raise exception 'LỖI: GV ghi OCR không qua API';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into storage.objects (bucket_id, name) values ('submissions', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/z/bai.jpg');
+    raise exception 'LỖI: GV tải ảnh bài làm không qua API';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
 
 -- GV đọc được danh sách (tên) để chọn học sinh khi tạo buổi, nhưng mọi thao tác ghi phải qua API
 do $$ begin
@@ -496,6 +536,17 @@ do $$ begin
  exception when insufficient_privilege then null; end;
 end $$;
 reset role;
+rollback;
+
+-- ===== Học sinh B (chủ bài nộp b0b0) =====
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+do $$ begin
+  assert (select count(*) from public.submissions) = 1, 'HS B thấy bài nộp của mình';
+  assert (select count(*) from storage.objects where bucket_id = 'submissions') = 1, 'HS B thấy ảnh của mình';
+  assert (select count(*) from public.submission_transcripts) = 0, 'HS B không thấy kết quả OCR (gợi ý cho GV)';
+end $$;
 rollback;
 
 select 'RLS OK' as ket_qua;

@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     assistant_max_output_tokens: int = 1000
     # Chỉ mở bài giảng cho HS sau khi nghiệm thu E6/E7 với model thật.
     assistant_student_lessons_enabled: bool = False
+    # OCR ảnh bài làm qua Gemini: tắt mặc định, model ghim qua cấu hình
+    ocr_enabled: bool = False
+    gemini_api_key: str = ""
+    gemini_ocr_model: str = ""
+    submission_max_files: int = 6
+    submission_max_bytes: int = 8 * 1024 * 1024
 
     @property
     def cors_origin_list(self) -> list[str]:
