@@ -9,7 +9,7 @@ import { Field } from "../../ui/Field";
 import { Alert, ErrorState, Loading, useToast } from "../../ui/Feedback";
 
 // weekday của API: 1 = thứ Hai … 7 = Chủ nhật
-const WEEKDAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"];
+export const WEEKDAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"];
 const DURATIONS = [45, 60, 90, 120, 180];
 
 /** Lịch cố định của một học sinh: xem, thêm, ngừng. API sinh buổi 4 tuần tới và bổ sung dần (M1a.3). */

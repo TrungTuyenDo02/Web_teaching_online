@@ -13,6 +13,7 @@ from livekit import api as lk
 from app.config import Settings
 from app.core import time as clock
 from app.models import DeviceMode, Role
+from app.services.board_document import BoardSnapshot, validate_snapshot
 
 # Lệch đồng hồ tối đa giữa các tiến trình API (bằng đệm một phút LiveKit tự dùng khi thu hồi)
 CLOCK_SKEW = timedelta(minutes=1)
@@ -88,7 +89,7 @@ def make_whiteboard_close_token(settings: Settings, *, session_id: str, act: str
     return jwt.encode(payload, settings.whiteboard_jwt_secret, algorithm="HS256")
 
 
-async def close_whiteboard_room(settings: Settings, session_id: str) -> list[dict]:
+async def close_whiteboard_room(settings: Settings, session_id: str) -> BoardSnapshot:
     """Báo máy chủ bảng ngắt mọi thiết bị, chặn token cũ; trả về nội dung bảng cuối cùng."""
     token = make_whiteboard_close_token(settings, session_id=session_id)
     async with httpx.AsyncClient(timeout=10) as client:
@@ -97,7 +98,12 @@ async def close_whiteboard_room(settings: Settings, session_id: str) -> list[dic
             headers={"Authorization": f"Bearer {token}"},
         )
         resp.raise_for_status()
-    return resp.json().get("elements", [])
+    body = resp.json()
+    if not isinstance(body, dict):
+        raise ValueError("Bảng đã lưu không hợp lệ")
+    return validate_snapshot(
+        body if "files" in body or "version" in body else body.get("elements", [])
+    )
 
 
 async def purge_whiteboard_room(settings: Settings, session_id: str) -> None:

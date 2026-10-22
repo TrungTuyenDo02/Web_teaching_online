@@ -77,6 +77,8 @@ LiveKit không bao giờ được kết nối. Test đối chứng ROOM-01 trỏ
 
 ## Giới hạn đã biết (2026-10-20)
 
+Tính năng chèn ảnh bảng (2026-10-22): [cách dùng và phạm vi kiểm](whiteboard-images.md). `e2e/board/images.spec.ts` kiểm chọn ảnh → đồng bộ hai trang → tải lại, và viewer hiển thị ảnh từ snapshot mới. Máy chủ bảng/WebSocket thật chạy cục bộ; Auth/API/Storage của phép thử xem lại là giả. Lượt riêng dùng `--grep '@smoke|BOARD-IMG' --workers=2` đạt **52/52**, không retry; output/report đặt trong thư mục tạm riêng để tránh hai phiên ghi cùng artifact. Chưa thay thế nghiệm thu tablet hoặc Supabase thật.
+
 - Song ngữ: bản tiếng Anh chưa có người bản ngữ duyệt. Câu lỗi API có tham số vẫn tiếng Việt; dữ liệu người dùng nhập không dịch. Kiểm "không sót chữ tiếng Việt" chỉ áp cho trang giới thiệu và đăng nhập (trang trong ứng dụng có tên học sinh tiếng Việt).
 
 - **Giao diện Excalidraw là tiếng Anh**: gói `vi-VN` của Excalidraw 0.18.1 dịch 49%, dưới ngưỡng 85% nên thư viện bỏ qua `langCode="vi-VN"`. Ảnh dán bị chặn bằng hộp thoại tiếng Anh "Images are disabled.", không có nút đóng. Cần quyết định (vá bản dịch, ẩn bớt giao diện, hoặc chấp nhận); chưa sửa.

@@ -342,3 +342,81 @@ def test_student_being_deleted_cannot_submit_and_upload_is_cleaned(
     assert submit(client, student, assignment["id"]).status_code == 404
     assert repo.submission_files == {}  # ảnh vừa ghi đã được dọn
     assert submit(client, student, assignment["id"]).status_code == 404
+
+
+# ---------- Chữa bài trên ảnh ----------
+
+
+def annotate(client, headers, submission_id, data=None):
+    return client.post(
+        f"/api/submissions/{submission_id}/annotations",
+        content=png() if data is None else data,
+        headers=headers,
+    )
+
+
+def test_teacher_annotates_image_stored_clean_and_locks_submission(
+    client, settings, repo, teacher, student, ocr
+):
+    settings.submission_max_files = 2
+    sub = submit(client, student, assign(client, teacher).json()["id"]).json()
+    assert annotate(client, student, sub["id"]).status_code == 404
+    assert annotate(client, auth_header(settings, OTHER_TEACHER_ID), sub["id"]).status_code == 404
+    assert annotate(client, teacher, sub["id"], b"%PDF-1.7").status_code == 422
+    response = annotate(client, teacher, sub["id"])
+    assert response.status_code == 201, response.text
+    row = response.json()
+    assert row["kind"] == "annotated"
+    assert row["storage_path"].startswith(f"{STUDENT_ID}/{sub['id']}/")
+    stored = repo.submission_files[row["storage_path"]]
+    assert GPS not in stored and b"Em A" not in stored
+    # Thầy cô đã bắt đầu chữa: học sinh không thêm ảnh vào lượt nộp này nữa
+    assert repo.submissions[sub["id"]].status == SubmissionStatus.reviewing
+    more = client.post(f"/api/submissions/{sub['id']}/files", content=png(), headers=student)
+    assert more.status_code == 409
+    # Giới hạn đếm riêng ảnh chữa; AI chỉ đọc ảnh gốc của học sinh
+    assert annotate(client, teacher, sub["id"]).status_code == 201
+    assert annotate(client, teacher, sub["id"]).status_code == 409
+    assert client.post(f"/api/submissions/{sub['id']}/ocr", headers=teacher).status_code == 200
+    [batch] = ocr
+    assert len(batch) == 1 and batch[0][1] == "image/jpeg"
+
+
+def test_teacher_deletes_only_annotated_files(client, settings, repo, teacher, student):
+    sub = submit(client, student, assign(client, teacher).json()["id"]).json()
+    other = submit(client, student, assign(client, teacher).json()["id"]).json()
+    original = next(f for f in repo.submission_rows if f.submission_id == sub["id"])
+    marked = annotate(client, teacher, sub["id"]).json()
+    url = f"/api/submissions/{sub['id']}/files"
+    assert client.delete(f"{url}/{original.id}", headers=teacher).status_code == 409
+    assert client.delete(f"{url}/{marked['id']}", headers=student).status_code == 404
+    other_url = f"/api/submissions/{other['id']}/files/{marked['id']}"
+    assert client.delete(other_url, headers=teacher).status_code == 404
+    assert client.delete(f"{url}/{marked['id']}", headers=teacher).status_code == 204
+    assert marked["storage_path"] not in repo.submission_files
+    assert [f.kind for f in repo.submission_rows] == ["original", "original"]
+    assert client.delete(f"{url}/{marked['id']}", headers=teacher).status_code == 404
+
+
+def test_teacher_asks_redo_student_submits_again(client, settings, repo, teacher, student):
+    assignment = assign(client, teacher).json()
+    first = submit(client, student, assignment["id"]).json()
+    url = f"/api/submissions/{first['id']}/return"
+    body = {"teacher_comment": "Câu 2 sai dấu, làm lại nhé", "score": None, "redo": True}
+    assert client.post(url, json=body, headers=student).status_code == 404
+    response = client.post(url, json=body, headers=teacher)
+    assert response.status_code == 200, response.text
+    # Lượt nộp cũ đã trả (học sinh đọc nhận xét); bài tập mở lại để nộp lượt mới
+    assert response.json()["status"] == "returned"
+    assert repo.assignments[assignment["id"]].status == "assigned"
+    second = submit(client, student, assignment["id"])
+    assert second.status_code == 201
+    assert repo.assignments[assignment["id"]].status == "submitted"
+    assert repo.submissions[first["id"]].teacher_comment == "Câu 2 sai dấu, làm lại nhé"
+    # Trả bài bình thường thì đóng hẳn
+    done = f"/api/submissions/{second.json()['id']}/return"
+    assert (
+        client.post(done, json={"teacher_comment": "Đúng rồi"}, headers=teacher).status_code == 200
+    )
+    assert repo.assignments[assignment["id"]].status == "returned"
+    assert submit(client, student, assignment["id"]).status_code == 409

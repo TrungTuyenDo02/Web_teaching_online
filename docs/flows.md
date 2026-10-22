@@ -214,8 +214,35 @@ sequenceDiagram
   end
   Note over WB: Một chu kỳ không có pong hay tin nào: terminate, gỡ khỏi phòng, gửi peers cho người còn lại (gỡ sau 15–30 giây). Phòng rỗng thì giữ và lưu như khi rời phòng
   Note over T,WB: Rớt mạng thì tự nối lại; init của máy chủ là mốc, máy viết gửi bù nét máy chủ chưa có
-  Note over T: Ảnh không đồng bộ: bị gỡ khỏi bảng kèm thông báo. Phần tử một mình quá 1 MB: bỏ qua, không làm rớt kết nối
+  Note over T: Ảnh đi qua nút Chèn ảnh đề bài (mục 4a); ảnh chưa tải xong không được gửi như phần tử. Phần tử một mình quá 1 MB: bỏ qua, không làm rớt kết nối
   Note over WB: Ghi data/boards/ID.json 2 giây sau nét cuối; mở lại phòng hoặc khởi động lại thì nạp lại
+```
+
+## 4a. Chèn ảnh và giữ ảnh khi xem lại
+
+Giới hạn và cách dùng: [whiteboard-images.md](whiteboard-images.md). Cùng quyền buổi học hiện có, không thêm bảng DB hoặc URL công khai.
+
+```mermaid
+sequenceDiagram
+  participant T as Giáo viên
+  participant WB as whiteboard-sync
+  participant S as Học sinh
+  participant API as API
+  participant ST as Storage boards riêng tư
+  T->>T: Chọn ảnh, vẽ lại bỏ metadata và thu kích thước
+  T->>WB: file_chunk trên socket đã xác thực
+  WB->>WB: Kiểm ảnh/quota, tính SHA256, ghi tệp riêng bền trên đĩa
+  WB-->>T: file_ack với ID nội dung
+  WB-->>S: file_data theo mảnh
+  T->>WB: update phần tử ảnh dùng ID đã xác nhận
+  WB-->>S: update (chỉ hiển thị sau khi có tệp hợp lệ)
+  T->>API: Kết thúc buổi
+  API->>WB: close
+  WB-->>API: version 2: elements và files
+  API->>API: Kiểm đủ tệp, tạo upload intent hiện có
+  API->>ST: Lưu snapshot JSON đầy đủ
+  S->>ST: Xem lại theo quyền buổi học/RLS hiện có
+  Note over WB,ST: Xóa hẳn học sinh dọn cả thư mục ảnh trên máy chủ và snapshot Storage
 ```
 
 ## 4b. Thử bảng viết cục bộ (chỉ development)
@@ -478,6 +505,25 @@ flowchart TD
 ```
 
 Trình duyệt chỉ đọc `assignments`, `submissions`, `submission_files`, `submission_transcripts` và ảnh trong giới hạn RLS (0011). Xem [assistant.md](assistant.md).
+
+## 8g. Chữa bài trên ảnh bằng bút (Giai đoạn 2)
+
+```mermaid
+flowchart TD
+  A[GV mở bài nộp, bấm Chữa trên ảnh ở một ảnh gốc] --> B[Excalidraw toàn màn hình: ảnh khóa làm nền ≤ 2560 px, bút đỏ chọn sẵn]
+  B --> C[GV viết đè bằng bút/chuột → Lưu ảnh chữa: xuất JPEG]
+  C --> D[POST /api/submissions/:id/annotations]
+  D --> E{API: GV của HS, ≤ giới hạn ảnh chữa, JPEG/PNG/WebP}
+  E -->|Không| X[404 / 409 / 413 / 422]
+  E -->|Có| F[Gỡ metadata, lưu submission_files kind=annotated cùng thư mục HS; bài nộp submitted → reviewing]
+  F --> G[GV xem ảnh chữa: Chữa tiếp tạo ảnh mới, Xóa ảnh chữa: DELETE /api/submissions/:id/files/:file]
+  F --> H[GV trả bài → HS thấy Bài thầy cô chữa cạnh nhận xét, điểm]
+  F --> R[GV Yêu cầu làm lại, bắt buộc nhận xét: lượt nộp returned, bài tập về assigned]
+  R --> S[HS thấy Cần làm lại + nhận xét + ảnh chữa → Nộp lại: lượt nộp mới, bài tập submitted]
+  S --> A
+```
+
+Ảnh gốc của học sinh không bị sửa hay xóa qua đường này (API trả 409); OCR chỉ gửi ảnh gốc. Xóa hẳn học sinh dọn cả ảnh chữa vì cùng thư mục `submissions/<student_id>/`. RLS 0001 cho học sinh đọc mọi `submission_files` của bài mình, nên ảnh chữa đọc được qua Supabase ngay khi lưu; giao diện chỉ hiện khi bài đã trả.
 
 ## 9. Lộ trình các giai đoạn
 

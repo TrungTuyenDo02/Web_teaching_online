@@ -6,6 +6,7 @@
 import * as api from "./api";
 import { supabase } from "./supabase";
 import { t } from "./i18n";
+import { readBoardDocument, type BoardDocument } from "./boardFiles";
 
 export type { AssignmentInput, DeviceMode, JoinResponse, Role, SessionCreate, SessionUpdate, Student, StudentInput, WeeklySlot, WeeklySlotInput } from "./api";
 
@@ -22,6 +23,7 @@ export interface SessionItem {
 
 export interface PastSession {
   id: string;
+  student_id: string;
   student_name: string;
   subject: string | null;
   topic: string | null;
@@ -59,9 +61,10 @@ export interface Backend {
   createAssistantMaterial: typeof api.createAssistantMaterial;
   deleteAssistantMaterial: typeof api.deleteAssistantMaterial;
   listUpcoming(): Promise<SessionItem[]>;
-  listHistory(): Promise<PastSession[]>;
+  /** Buổi đã kết thúc, mới nhất trước (tối đa 50); truyền studentId để chỉ lấy của một học sinh. */
+  listHistory(studentId?: string): Promise<PastSession[]>;
   listStudentOptions(): Promise<StudentOption[]>;
-  loadBoard(sessionId: string): Promise<unknown[]>;
+  loadBoard(sessionId: string): Promise<unknown[] | BoardDocument>;
   joinSession: typeof api.joinSession;
   endSession: typeof api.endSession;
   createSession: typeof api.createSession;
@@ -88,6 +91,8 @@ export interface Backend {
   createAssignment: typeof api.createAssignment;
   submitAssignment: typeof api.submitAssignment;
   addSubmissionImage: typeof api.addSubmissionImage;
+  annotateSubmission: typeof api.annotateSubmission;
+  deleteAnnotation: typeof api.deleteAnnotation;
   ocrSubmission: typeof api.ocrSubmission;
   returnSubmission: typeof api.returnSubmission;
 }
@@ -128,13 +133,13 @@ const supabaseBackend: Backend = {
       student_name: nameOf(row),
     }));
   },
-  async listHistory() {
-    const { data, error } = await client()
+  async listHistory(studentId) {
+    let query = client()
       .from("sessions")
-      .select("id, subject, topic, scheduled_start, summary, homework_note, board_snapshot_path, students(full_name)")
-      .eq("status", "completed")
-      .order("scheduled_start", { ascending: false })
-      .limit(50);
+      .select("id, student_id, subject, topic, scheduled_start, summary, homework_note, board_snapshot_path, students(full_name)")
+      .eq("status", "completed");
+    if (studentId) query = query.eq("student_id", studentId);
+    const { data, error } = await query.order("scheduled_start", { ascending: false }).limit(50);
     if (error) readFailed();
     return ((data ?? []) as unknown as (Omit<PastSession, "student_name"> & Joined)[]).map((row) => ({
       ...row,
@@ -154,7 +159,7 @@ const supabaseBackend: Backend = {
     const file = await client().storage.from("boards").download(data.board_snapshot_path);
     if (file.error) throw new Error("Không tải được bảng đã lưu.");
     const elements: unknown = JSON.parse(await file.data.text());
-    return Array.isArray(elements) ? elements : [];
+    return readBoardDocument(elements);
   },
   joinSession: api.joinSession,
   endSession: api.endSession,
@@ -203,6 +208,8 @@ const supabaseBackend: Backend = {
   createAssignment: api.createAssignment,
   submitAssignment: api.submitAssignment,
   addSubmissionImage: api.addSubmissionImage,
+  annotateSubmission: api.annotateSubmission,
+  deleteAnnotation: api.deleteAnnotation,
   ocrSubmission: api.ocrSubmission,
   returnSubmission: api.returnSubmission,
 };

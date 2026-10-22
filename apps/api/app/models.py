@@ -363,3 +363,5 @@ class SubmissionReturn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     teacher_comment: str = Field(default="", max_length=4000)
     score: float | None = Field(default=None, ge=0, le=10)
+    # Làm lại: lượt nộp này vẫn trả (HS đọc nhận xét), bài tập mở lại (assigned) cho lượt mới
+    redo: bool = False

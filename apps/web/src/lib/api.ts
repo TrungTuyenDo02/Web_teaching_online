@@ -205,7 +205,7 @@ export const askAssistant = (body: { question: string; language: "vi" | "en"; co
 // ---------- Bài tập, bài nộp, OCR (0011: mọi thao tác ghi qua API) ----------
 export interface Assignment { id: string; student_id: string; title: string; description: string | null; due_at: string | null; status: "assigned" | "submitted" | "returned"; created_at: string }
 export interface Submission { id: string; student_id: string; assignment_id: string | null; status: "submitted" | "reviewing" | "returned"; submitted_at: string; teacher_comment: string | null; score: number | null; returned_at: string | null }
-export interface SubmissionFile { id: string; submission_id: string; storage_path: string; mime_type: string | null; size_bytes: number | null }
+export interface SubmissionFile { id: string; submission_id: string; storage_path: string; kind: "original" | "annotated"; mime_type: string | null; size_bytes: number | null }
 export interface Transcript { id: string; submission_id: string; model: string; content: string; created_at: string }
 export interface AssignmentInput { student_id: string; title: string; description: string; due_at: string | null }
 export const createAssignment = (body: AssignmentInput) => apiFetch<Assignment>("/api/assignments", { method: "POST", body: JSON.stringify(body) });
@@ -213,8 +213,10 @@ export const createAssignment = (body: AssignmentInput) => apiFetch<Assignment>(
 const imageInit = (image: Blob): RequestInit => ({ method: "POST", body: image, headers: { "Content-Type": image.type || "application/octet-stream" } });
 export const submitAssignment = (assignmentId: string, image: Blob) => apiFetch<Submission>(`/api/assignments/${assignmentId}/submissions`, imageInit(image));
 export const addSubmissionImage = (submissionId: string, image: Blob) => apiFetch<SubmissionFile>(`/api/submissions/${submissionId}/files`, imageInit(image));
+export const annotateSubmission = (submissionId: string, image: Blob) => apiFetch<SubmissionFile>(`/api/submissions/${submissionId}/annotations`, imageInit(image));
+export const deleteAnnotation = (submissionId: string, fileId: string) => apiFetch<void>(`/api/submissions/${submissionId}/files/${fileId}`, { method: "DELETE" });
 export const ocrSubmission = (submissionId: string) => apiFetch<Transcript>(`/api/submissions/${submissionId}/ocr`, { method: "POST" });
-export const returnSubmission = (submissionId: string, body: { teacher_comment: string; score: number | null }) =>
+export const returnSubmission = (submissionId: string, body: { teacher_comment: string; score: number | null; redo?: boolean }) =>
   apiFetch<Submission>(`/api/submissions/${submissionId}/return`, { method: "POST", body: JSON.stringify(body) });
 
 // Teacher-Ops chỉ đọc: lịch, học sinh, số buổi; API gửi tên học sinh cho provider dưới dạng mã

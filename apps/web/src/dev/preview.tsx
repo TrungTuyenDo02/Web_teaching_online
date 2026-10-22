@@ -45,7 +45,7 @@ function seed() {
     session("u4", "s3", 60 * 24 * 3, 45, "Toán", "Số hữu tỉ"),
   ];
   const past = (id: string, studentId: string, daysAgo: number, topic: string, summary: string, homework: string | null, board: boolean): PastSession => ({
-    id, student_name: name(studentId), subject: "Toán", topic, scheduled_start: at(-60 * 24 * daysAgo),
+    id, student_id: studentId, student_name: name(studentId), subject: "Toán", topic, scheduled_start: at(-60 * 24 * daysAgo),
     summary, homework_note: homework, board_snapshot_path: board ? `${studentId}/${id}.json` : null,
   });
   const history: (PastSession & { student_id: string })[] = [
@@ -53,7 +53,7 @@ function seed() {
     { ...past("h2", "s2", 3, "Hàm số bậc nhất", "Vẽ đồ thị y = ax + b", "Vẽ 3 đồ thị trong phiếu", true), student_id: "s2" },
     { ...past("h3", "s1", 9, "Nhân đa thức", "Nhân đơn thức với đa thức", null, false), student_id: "s1" },
   ];
-  // Bài tập: một bài chưa nộp, một bài đã nộp (ảnh mẫu), một bài đã trả
+  // Bài tập: một bài chưa nộp, một bài đã nộp (ảnh mẫu), một bài đã trả, một bài cần làm lại (có ảnh chữa)
   const assignment = (id: string, studentId: string, title: string, description: string, status: AssignmentItem["status"], daysAgo: number): AssignmentItem => ({
     id, student_id: studentId, student_name: name(studentId), title, description, due_at: at(60 * 24 * 3), status,
     created_at: at(-60 * 24 * daysAgo), submissions: [],
@@ -62,10 +62,16 @@ function seed() {
     assignment("a1", "s1", "Bài 1–5 trang 19", "Phân tích đa thức thành nhân tử", "assigned", 2),
     { ...assignment("a2", "s1", "Phiếu luyện phương trình", "Giải và thử lại nghiệm", "submitted", 4),
       submissions: [{ id: "sub-a2", student_id: "s1", assignment_id: "a2", status: "submitted", submitted_at: at(-60 * 20), teacher_comment: null, score: null, returned_at: null,
-        files: [{ id: "f-a2", submission_id: "sub-a2", storage_path: "sample:bai-lam", mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
+        files: [{ id: "f-a2", submission_id: "sub-a2", storage_path: "sample:bai-lam", kind: "original" as const, mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
     { ...assignment("a3", "s2", "Vẽ 3 đồ thị", "Hàm số bậc nhất trong phiếu", "returned", 6),
       submissions: [{ id: "sub-a3", student_id: "s2", assignment_id: "a3", status: "returned", submitted_at: at(-60 * 24 * 5), teacher_comment: "Đồ thị đúng, nhớ ghi tên trục.", score: 8.5, returned_at: at(-60 * 24 * 4),
-        files: [{ id: "f-a3", submission_id: "sub-a3", storage_path: "sample:bai-lam", mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
+        files: [{ id: "f-a3", submission_id: "sub-a3", storage_path: "sample:bai-lam", kind: "original" as const, mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
+    { ...assignment("a4", "s1", "Bài 6 trang 20", "Giải hệ phương trình", "assigned", 3),
+      submissions: [{ id: "sub-a4", student_id: "s1", assignment_id: "a4", status: "returned", submitted_at: at(-60 * 24 * 2), teacher_comment: "Câu b sai dấu ở bước chuyển vế, em làm lại nhé.", score: null, returned_at: at(-60 * 24),
+        files: [
+          { id: "f-a4", submission_id: "sub-a4", storage_path: "sample:bai-lam", kind: "original" as const, mime_type: "image/svg+xml", size_bytes: null },
+          { id: "f-a4-mark", submission_id: "sub-a4", storage_path: "sample:bai-lam", kind: "annotated" as const, mime_type: "image/svg+xml", size_bytes: null },
+        ], transcripts: [] }] },
   ];
   return { assignments, images: {} as Record<string, string>, students, sessions, history, topics: [{ id: "preview-topic-1", name: "Phương trình", grade: "9" }] as TeachingTopic[], privateNotes: {} as Record<string, TeachingRecord>, slots: [] as WeeklySlot[], slotSessions: {} as Record<string, string[]>, emails: new Set(["daco@example.com"]), deleteTries: new Set<string>(), endTries: new Set<string>() };
 }
@@ -199,7 +205,7 @@ function previewBackend(role: PreviewRole): Backend {
       const path = `${a.student_id}/${id}/1.jpg`;
       db.images[path] = URL.createObjectURL(image);
       const sub = { id, student_id: a.student_id, assignment_id: a.id, status: "submitted" as const, submitted_at: new Date().toISOString(), teacher_comment: null, score: null, returned_at: null };
-      a.submissions.unshift({ ...sub, files: [{ id: crypto.randomUUID(), submission_id: id, storage_path: path, mime_type: image.type, size_bytes: image.size }], transcripts: [] });
+      a.submissions.unshift({ ...sub, files: [{ id: crypto.randomUUID(), submission_id: id, storage_path: path, kind: "original" as const, mime_type: image.type, size_bytes: image.size }], transcripts: [] });
       a.status = "submitted";
       return clone(sub);
     },
@@ -207,12 +213,32 @@ function previewBackend(role: PreviewRole): Backend {
       await wait();
       const sub = mine(db.assignments).flatMap((a) => a.submissions).find((s) => s.id === submissionId);
       if (!sub || role !== "student") throw new Error("Không tìm thấy bài nộp");
-      if (sub.files.length >= 6) throw new Error("Mỗi bài nộp tối đa 6 ảnh.");
+      if (sub.files.filter((f) => f.kind === "original").length >= 6) throw new Error("Mỗi bài nộp tối đa 6 ảnh.");
       const path = `${sub.student_id}/${sub.id}/${sub.files.length + 1}.jpg`;
       db.images[path] = URL.createObjectURL(image);
-      const file = { id: crypto.randomUUID(), submission_id: sub.id, storage_path: path, mime_type: image.type, size_bytes: image.size };
+      const file = { id: crypto.randomUUID(), submission_id: sub.id, storage_path: path, kind: "original" as const, mime_type: image.type, size_bytes: image.size };
       sub.files.push(file);
       return clone(file);
+    },
+    async annotateSubmission(submissionId, image) {
+      teacherOnly(); await wait();
+      const sub = db.assignments.flatMap((a) => a.submissions).find((s) => s.id === submissionId);
+      if (!sub) throw new Error("Không tìm thấy bài nộp");
+      if (sub.files.filter((f) => f.kind === "annotated").length >= 6) throw new Error("Mỗi bài nộp tối đa 6 ảnh chữa.");
+      const path = `${sub.student_id}/${sub.id}/${crypto.randomUUID()}.jpg`;
+      db.images[path] = URL.createObjectURL(image);
+      const file = { id: crypto.randomUUID(), submission_id: sub.id, storage_path: path, kind: "annotated" as const, mime_type: image.type, size_bytes: image.size };
+      sub.files.push(file);
+      if (sub.status === "submitted") sub.status = "reviewing";
+      return clone(file);
+    },
+    async deleteAnnotation(submissionId, fileId) {
+      teacherOnly(); await wait();
+      const sub = db.assignments.flatMap((a) => a.submissions).find((s) => s.id === submissionId);
+      const file = sub?.files.find((f) => f.id === fileId);
+      if (!sub || !file) throw new Error("Không tìm thấy ảnh");
+      if (file.kind !== "annotated") throw new Error("Chỉ xóa được ảnh thầy cô chữa, không xóa ảnh bài làm của học sinh.");
+      sub.files = sub.files.filter((f) => f.id !== fileId);
     },
     // Không giả kết quả AI: xem trước không gọi Gemini
     async ocrSubmission() { teacherOnly(); await wait(); throw new Error("Đọc bài bằng AI chưa được bật hoặc cấu hình."); },
@@ -222,7 +248,7 @@ function previewBackend(role: PreviewRole): Backend {
       const sub = a?.submissions.find((s) => s.id === submissionId);
       if (!a || !sub) throw new Error("Không tìm thấy bài nộp");
       Object.assign(sub, { status: "returned", teacher_comment: body.teacher_comment || null, score: body.score, returned_at: new Date().toISOString() });
-      a.status = "returned";
+      a.status = body.redo ? "assigned" : "returned";
       const { files: _f, transcripts: _t, ...plain } = sub;
       return clone(plain);
     },
@@ -274,9 +300,9 @@ function previewBackend(role: PreviewRole): Backend {
       await wait();
       return clone(mine(db.sessions).filter((s) => ["scheduled", "live"].includes(s.status)));
     },
-    async listHistory() {
+    async listHistory(studentId) {
       await wait();
-      return clone(mine(db.history));
+      return clone(mine(db.history).filter((h) => !studentId || h.student_id === studentId));
     },
     async listStudentOptions() {
       await wait(150);

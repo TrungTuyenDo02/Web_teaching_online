@@ -2,10 +2,12 @@ import type { WebSocket } from "ws";
 import type { BoardClaims } from "./auth.ts";
 import { Scene, type BoardElement } from "./scene.ts";
 import { errorCode, type SceneStore } from "./store.ts";
+import { ImageUpload, MAX_ROOM_IMAGE_BYTES, type BoardFile } from "./images.ts";
 
 export interface Peer {
   socket: WebSocket;
   claims: BoardClaims;
+  sendFile?(file: BoardFile): void;
 }
 
 export class Room {
@@ -13,6 +15,11 @@ export class Room {
   readonly peers = new Set<Peer>();
   cleanupTimer: NodeJS.Timeout | undefined;
   saveTimer: NodeJS.Timeout | undefined;
+  files: Record<string, BoardFile> = {};
+  upload?: ImageUpload;
+  uploadOwner?: Peer;
+
+  stopUpload(): void { this.upload?.stop(); this.upload = undefined; this.uploadOwner = undefined; }
 }
 
 // Trong RAM: nhớ buổi đã kết thúc lâu hơn hạn token bảng viết. Có store thì dấu đóng còn được
@@ -36,6 +43,7 @@ export class RoomHub {
       room = new Room();
       // Nạp bản đã lưu: máy chủ khởi động lại hoặc phòng đã được giải phóng khỏi bộ nhớ
       if (this.store) room.scene.apply(this.store.load(sessionId));
+      if (this.store) room.files = this.store.loadFiles(sessionId);
       this.rooms.set(sessionId, room);
     }
     if (room.cleanupTimer) {
@@ -50,6 +58,7 @@ export class RoomHub {
     const room = this.rooms.get(sessionId);
     if (!room) return;
     room.peers.delete(peer);
+    if (room.uploadOwner === peer) room.stopUpload();
     if (room.peers.size === 0) {
       // Giữ nội dung một lúc để nối lại khi rớt mạng; sau đó giải phóng bộ nhớ
       clearTimeout(room.cleanupTimer);
@@ -92,6 +101,24 @@ export class RoomHub {
     return room?.peers.has(peer) ? room : undefined;
   }
 
+  filesOf(sessionId: string): Record<string, BoardFile> {
+    return this.rooms.get(sessionId)?.files ?? this.store?.loadFiles(sessionId) ?? {};
+  }
+
+  addFile(sessionId: string, peer: Peer, file: BoardFile): BoardFile {
+    const room = this.roomOf(sessionId, peer);
+    if (!room || this.isEnded(sessionId)) throw new Error("Buổi học đã kết thúc.");
+    if (room.files[file.id]) return room.files[file.id]!;
+    const files = Object.values(room.files);
+    const sizeOf = (f: BoardFile) => Buffer.from(f.dataURL.slice(f.dataURL.indexOf(",") + 1), "base64").length;
+    if (files.length >= 20 || files.reduce((sum, f) => sum + sizeOf(f), sizeOf(file)) > MAX_ROOM_IMAGE_BYTES) throw new Error("Bảng đã đạt giới hạn ảnh (20 ảnh hoặc 6 MiB).");
+    const projected = JSON.stringify({ version: 2, elements: room.scene.snapshot(), files: { ...room.files, [file.id]: file } });
+    if (Buffer.byteLength(projected) > 18 * 1024 * 1024) throw new Error("Bảng quá lớn để chèn thêm ảnh.");
+    this.store?.saveFile(sessionId, file); // chỉ ACK sau khi ghi bền
+    room.files[file.id] = file;
+    return file;
+  }
+
   /**
    * Giáo viên kết thúc buổi: chặn ngay trong RAM, lưu bản cuối, ghi dấu đóng xuống đĩa.
    * Gọi lại được (kể cả sau khởi động lại); trả về nội dung bảng cuối cùng.
@@ -103,6 +130,7 @@ export class RoomHub {
     this.ended.set(sessionId, now + ENDED_RETENTION_MS);
     const room = this.rooms.get(sessionId);
     if (room) {
+      room.stopUpload();
       if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
       room.peers.clear(); // roomOf không còn trả phòng này: nét đến sau lúc đóng bị bỏ qua
     }
@@ -123,6 +151,7 @@ export class RoomHub {
     this.ended.set(sessionId, now + ENDED_RETENTION_MS);
     const room = this.rooms.get(sessionId);
     if (room) {
+      room.stopUpload();
       clearTimeout(room.cleanupTimer);
       clearTimeout(room.saveTimer); // nét đang chờ ghi không được tạo lại file sau khi xóa
       room.peers.clear();
@@ -148,6 +177,7 @@ export class RoomHub {
 
   closeAll(): void {
     for (const [sessionId, room] of this.rooms) {
+      room.stopUpload();
       if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
       this.trySave(sessionId, room); // tắt máy chủ: ghi nốt phần chưa lưu (kể cả lần ghi trước bị lỗi)
     }

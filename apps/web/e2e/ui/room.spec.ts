@@ -162,4 +162,10 @@ test("ROOM-06 phòng học có bảng, ô người kia và ô của mình; khôn
   await expect(self.locator(".video-tile__chibi")).toHaveCount(0);
   await video.getByRole("button", { name: "Tắt camera" }).click();
   await expect(self.locator(".video-tile__chibi")).toBeVisible();
+  // Micro giả của Chromium phát tiếng bíp: thanh mức âm phải nhúc nhích
+  await video.getByRole("button", { name: "Thử micro" }).click();
+  const meter = video.getByRole("meter", { name: "Mức âm micro" });
+  await expect.poll(() => meter.evaluate((m: HTMLMeterElement) => m.value)).toBeGreaterThan(0);
+  await video.getByRole("button", { name: "Tắt micro" }).click();
+  await expect(meter).toHaveCount(0);
 });

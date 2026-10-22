@@ -231,9 +231,9 @@ CI trên GitHub Actions chạy ở mỗi lần push vào `main` và mỗi pull r
 | GĐ3 | AI gợi ý chấm, Teacher-Ops ghi dữ liệu, Tutor | Mới có phần chỉ đọc (M1b.1); xem [docs/platform-workflow.md](docs/platform-workflow.md) |
 
 Còn mở trước khi dạy thật:
-- **Lỗi token video:** token cấp trước khi kết thúc buổi vẫn vào lại được phòng đã xóa trên LiveKit Cloud trong khoảng 6–12 phút. Chưa chốt hướng sửa; xem [docs/design-video-token.md](docs/design-video-token.md) mục 9.3.
-- Migration `0011` chưa áp lên Supabase thật (0001–0010 đã áp, verify 22/22).
-- Chưa chạy toàn luồng với Supabase và LiveKit thật trên hai máy, chưa thử bút trên tablet Android, chưa thử sao lưu và khôi phục.
+- **Lỗi token video:** một lần thu hồi chỉ được quan sát còn hiệu lực ở phút 6 và hết hiệu lực ở phút 12; sau đó token cũ còn hạn có thể vào lại phòng đã xóa. Chưa chốt hướng sửa; xem [docs/design-video-token.md](docs/design-video-token.md) mục 9.3.
+- Migration `0011` chưa áp theo sổ, chỉ cần cho bài tập GĐ2; ảnh bảng GĐ1 không cần migration này. 0001–0010 đã áp, verify 22/22 theo chủ dự án.
+- Tablet đã thử nhanh nét bút/tì tay/tự nối lại; ảnh mới, video hai máy với Supabase/LiveKit thật, buổi 45–60 phút và backup/restore chưa nghiệm thu. Chủ dự án đang hoãn chạy thử.
 - Giao diện Excalidraw còn tiếng Anh; Dockerfile và `docker-compose.yml` chưa build thử.
 
 Tiến độ chi tiết và việc tiếp theo: [docs/progress.md](docs/progress.md), là sổ bàn giao duy nhất.
@@ -249,6 +249,7 @@ Tiến độ chi tiết và việc tiếp theo: [docs/progress.md](docs/progress
 | Bật bot AI, đọc ảnh, dữ liệu gửi đi | [docs/assistant.md](docs/assistant.md) |
 | Thử bảng với tablet | [docs/tablet-wifi.md](docs/tablet-wifi.md) |
 | Nghiệm thu, migration thật, sao lưu | [docs/acceptance.md](docs/acceptance.md) |
+| Vận hành, xử lý lỗi, nâng cấp và phục hồi GĐ1 | [docs/operations.md](docs/operations.md) |
 | Kiểm thử | [docs/testing.md](docs/testing.md), [docs/testing-plan.md](docs/testing-plan.md) |
 | Giao diện và thành phần | [DESIGN.md](DESIGN.md) |
 | Lộ trình mở rộng Tutor | [docs/platform-workflow.md](docs/platform-workflow.md); `TUTOR_PLATFORM_SPEC.md` là bản nháp, `STATUS.md` là nhật ký mốc |

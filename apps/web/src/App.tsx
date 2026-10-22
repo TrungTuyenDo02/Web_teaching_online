@@ -13,6 +13,7 @@ import MonthlyReportPage from "./pages/MonthlyReportPage";
 import TeachingNotesPage from "./pages/TeachingNotesPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import RoomPage from "./pages/RoomPage";
+import StudentProfilePage from "./pages/StudentProfilePage";
 import StudentsPage from "./pages/StudentsPage";
 import AssistantMaterialsPage from "./pages/AssistantMaterialsPage";
 import AssignmentsPage from "./pages/AssignmentsPage";
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/history" element={<RequireAuth><HistoryPage /></RequireAuth>} />
         <Route path="/history/:sessionId/board" element={<RequireAuth><BoardReviewPage /></RequireAuth>} />
         <Route path="/students" element={<RequireAuth><StudentsPage /></RequireAuth>} />
+        <Route path="/students/:studentId" element={<RequireAuth><StudentProfilePage /></RequireAuth>} />
         <Route path="/reports" element={<RequireAuth><MonthlyReportPage /></RequireAuth>} />
         <Route path="/assignments" element={<RequireAuth><AssignmentsPage /></RequireAuth>} />
         <Route path="/teaching-notes" element={<RequireAuth><TeachingNotesPage /></RequireAuth>} />

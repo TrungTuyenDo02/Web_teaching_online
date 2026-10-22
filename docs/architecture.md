@@ -25,10 +25,12 @@ Modular monolith cộng dịch vụ có sẵn: một API nhỏ, một máy chủ
 ## Dữ liệu và lưu giữ
 
 - Ảnh bài làm: bucket `submissions` (riêng tư), đường dẫn `<student_id>/<submission_id>/<tên file>`.
-- Snapshot JSON của bảng cuối buổi: bucket `boards`, cùng quy ước thư mục theo `student_id`. PNG là bản tải thủ công trên giao diện.
+- Snapshot JSON của bảng cuối buổi: bucket `boards`, cùng quy ước thư mục theo `student_id`. Bảng có ảnh dùng `{version:2,elements,files}`, reader vẫn nhận mảng cũ. Máy chủ giữ tệp ảnh riêng cạnh scene, ghi bền trước ACK; purge dọn cả ảnh. PNG là bản tải thủ công trên giao diện. Chi tiết: [whiteboard-images.md](whiteboard-images.md).
 - Thời gian lưu giữ cấu hình bằng `SUBMISSION_RETENTION_DAYS` (chưa có tác vụ thực thi, cần làm trước khi dùng với dữ liệu thật).
 
 ## Mở rộng
 
 - Học sinh tăng: video là khoản chi chính. Đổi gói LiveKit hoặc tự dựng LiveKit (mã nguồn mở) mà không đổi giao diện, vì token do API cấp.
 - Máy chủ bảng viết chạy một tiến trình, giữ phòng đang hoạt động trong bộ nhớ và lưu scene định kỳ ra `data/boards`, kèm dấu đóng/xóa trên đĩa để phục hồi sau khởi động lại. Nếu cần chạy nhiều tiến trình thì phải thiết kế đồng bộ/lưu trữ dùng chung; hiện chưa thêm Redis hay dịch vụ mới.
+
+Khởi động, xử lý finalize/xóa còn dở, giữ volume, nâng cấp và phục hồi: [operations.md](operations.md). Hướng dẫn đã chuẩn bị; chưa có kết quả nghiệm thu/restore thật.

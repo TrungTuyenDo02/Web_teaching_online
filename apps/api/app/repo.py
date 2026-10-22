@@ -1,7 +1,6 @@
 """Lớp truy cập dữ liệu. Router chỉ làm việc với `Repository`, nên test dùng bản giả
 và sau này có thể đổi Supabase sang cơ sở dữ liệu khác mà không sửa router."""
 
-import json
 from datetime import date, datetime
 from typing import Any, Protocol
 
@@ -28,6 +27,7 @@ from app.models import (
     UploadIntent,
     WeeklySlot,
 )
+from app.services.board_document import BoardSnapshot, encode_snapshot, validate_snapshot
 
 
 class AuthAdminError(Exception):
@@ -172,7 +172,7 @@ class Repository(Protocol):
         ...
 
     async def save_board_snapshot(
-        self, student_id: str, session_id: str, elements: list[dict]
+        self, student_id: str, session_id: str, elements: BoardSnapshot
     ) -> str:
         """Lưu nội dung bảng cuối buổi vào bucket boards; trả về đường dẫn trong bucket."""
         ...
@@ -256,6 +256,10 @@ class Repository(Protocol):
     async def list_submission_files(self, submission_id: str) -> list[SubmissionFileRow]: ...
 
     async def insert_submission_file(self, fields: dict[str, Any]) -> SubmissionFileRow: ...
+
+    async def delete_submission_file(self, file_id: str) -> None:
+        """Xóa hàng submission_files (tệp trong Storage xóa riêng bằng delete_submission_object)."""
+        ...
 
     async def upload_submission_object(self, path: str, data: bytes, mime: str) -> None:
         """Tải ảnh (đã gỡ metadata) vào bucket submissions, không ghi đè."""
@@ -420,6 +424,15 @@ class SupabaseRepository:
 
     async def insert_submission_file(self, fields: dict[str, Any]) -> SubmissionFileRow:
         return SubmissionFileRow.model_validate(await self._insert_row("submission_files", fields))
+
+    async def delete_submission_file(self, file_id: str) -> None:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.delete(
+                f"{self._base}/submission_files",
+                headers=self._headers,
+                params={"id": f"eq.{file_id}"},
+            )
+            resp.raise_for_status()
 
     async def upload_submission_object(self, path: str, data: bytes, mime: str) -> None:
         headers = self._headers | {"Content-Type": mime, "x-upsert": "false"}
@@ -804,14 +817,14 @@ class SupabaseRepository:
             resp.raise_for_status()
 
     async def save_board_snapshot(
-        self, student_id: str, session_id: str, elements: list[dict]
+        self, student_id: str, session_id: str, elements: BoardSnapshot
     ) -> str:
         path = _board_path(student_id, session_id)
         headers = self._headers | {"Content-Type": "application/json", "x-upsert": "true"}
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 f"{self._storage}/boards/{path}",
-                content=json.dumps(elements).encode(),
+                content=encode_snapshot(validate_snapshot(elements)),
                 headers=headers,
             )
             resp.raise_for_status()

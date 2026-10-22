@@ -2,9 +2,11 @@
 
 Dành cho chủ dự án (giáo viên) và người thử. Ghi kết quả thật vào cột **Kết quả**: `Đạt`, `Lỗi` (kèm mô tả ngắn, không chép dữ liệu học sinh), `Chưa thử`. Chỉ dùng **dữ liệu giả** (tên "Em Thử A", email kiểu `thu-a@example.com`), không dùng học sinh thật.
 
-Cập nhật lần cuối: 2026-10-20.
+Cập nhật hướng dẫn: 2026-10-22. **Chủ dự án yêu cầu chưa chạy thử**; các mục chưa có kết quả vẫn để chờ. Vận hành và phục hồi: [operations.md](operations.md). Kế hoạch bàn giao: [phase1-handoff](superpowers/plans/2026-10-22-phase1-handoff.md).
 
-## 0. Đã kiểm tra tự động (2026-10-20)
+## 0. Kết quả đã ghi nhận từ các phiên trước
+
+Các dòng dưới là lịch sử, không phải lần kiểm mới. Phiên chèn ảnh 2026-10-22 ghi nhận 296 test API, 84 test bảng, 52 test trình duyệt; phiên video sau đó ghi nhận thêm room.spec 8/8. Test mô phỏng không thay nghiệm thu dịch vụ/thiết bị thật; chi tiết môi trường và lệnh trong progress.
 
 | Mục | Cách kiểm | Kết quả |
 |-----|-----------|---------|
@@ -15,31 +17,22 @@ Cập nhật lần cuối: 2026-10-20.
 | Script bắt tay không báo đạt sai | `handshake_negative_test.sh`: SQL lỗi, kết nối đóng, treo, kết quả chữ/rỗng, thiếu `;`, ghi hụt, bắt tay viết sai | Đạt 8/8 (đều bị bắt, đúng mã thoát) |
 | `verify_migrations.sql` phân biệt đúng | Chạy trên DB chỉ có 0001–0003 (báo thiếu 0004–0007) và sau khi áp đủ (đạt hết) | Đạt |
 | Cấu hình thật, chỉ đọc | `python -m app.preflight` (không in URL/khóa) | Biến đủ; PostgREST bằng service role đạt; bucket `boards`, `submissions` riêng tư; JWKS 1 khóa; LiveKit liệt kê phòng được |
-| Schema Supabase thật | như trên | **0004, 0005, 0006, 0007 chưa áp** |
+| Schema Supabase thật | Chủ dự án áp và báo verifier, nhật ký 2026-10-21 | **0001–0010 đã áp, 22/22; 0011 chưa áp theo sổ**; chưa kiểm lại Cloud lần này |
 | Máy chủ bảng | như trên | Không kết nối được (chưa chạy `make dev-board` lúc kiểm), chưa phải lỗi |
 | Token video cấp trước khi kết thúc | Phòng tạm tên ngẫu nhiên, danh tính giả trên LiveKit Cloud (`wss`), `livekit-api` 1.2.2, client `livekit` 1.1.21; gọi đúng `close_livekit_room` của API | **Lỗi (hở đã xác nhận)**: client bị ngắt với lý do `ROOM_DELETED`, nhưng dùng lại token cũ thì vào được, giữ kết nối ≥ 15 s, `list_participants` thấy người đó trong phòng. Xem mục 5 |
-| CI trên GitHub (job `rls`) | | Chưa chạy (chưa push) |
+| CI trên GitHub (`rls`, `web-e2e`) | Đã có push theo sổ | Chưa xác minh kết quả job |
 
-## 1. Áp migration 0004–0008 (chủ dự án làm)
+## 1. Đối chiếu schema trước nghiệm thu — chưa thực hiện lần này
 
-Đã áp: 0001, 0002, 0003; **0004–0007 chủ dự án áp 2026-10-20**, báo `verify_migrations.sql` 10/10 dòng `true` (bản kiểm trước khi có 0008). Chủ dự án cũng đã chạy 0008 cùng ngày; bản kiểm 14 dòng: **14/14 `true`** (chủ dự án gửi kết quả). Chưa chạy preflight sau khi áp. **Không chạy lại 0001–0008.**
+Theo sổ mới nhất: **0001–0010 đã áp**, chủ dự án báo verify 22/22 ngày 2026-10-21. **Không chạy lại các migration này.** Migration **0011 chưa áp theo sổ**, chỉ phục vụ giao/nộp/trả bài M2.1; không phải điều kiện cho bảng ảnh GĐ1.
 
-Bốn file 0004–0007 chỉ thêm cột, chỉ mục và một bảng mới; không xóa hay đổi dữ liệu có sẵn, trừ 0004 đánh dấu mọi buổi `completed` cũ là đã xong (để API không đóng lại hàng loạt). 0008 thêm 3 bảng riêng, RLS và RPC; không chép hay đổi summary/homework_note cũ. Tính năng ghi chú riêng cần 0008; nghiệm thu phòng học vẫn cần 0004–0007.
+Khi chủ dự án tiếp tục nghiệm thu:
 
-1. Dừng API đang chạy (nếu có). Code API hiện tại cần các cột này; áp xong mới chạy lại.
-2. Nếu gói Supabase có sao lưu: Database > Backups, ghi lại thời điểm bản sao gần nhất.
-3. Supabase Dashboard > SQL Editor > New query. Dán **toàn bộ** nội dung từng file, bấm Run, theo đúng thứ tự, mỗi file một lần:
-   1. `supabase/migrations/0004_session_finalize.sql`
-   2. `supabase/migrations/0005_student_deleting.sql`
-   3. `supabase/migrations/0006_board_upload_intents.sql`
-   4. `supabase/migrations/0007_upload_intent_cleaned.sql`
-   5. `supabase/migrations/0008_private_teaching_notes.sql`
-   6. `supabase/migrations/0009_weekly_slots.sql` (lịch hằng tuần, thêm 2026-10-20; chủ dự án đã áp 0004–0008, **chỉ cần chạy 0009**)
-
-   File nào báo lỗi thì dừng, không chạy file sau, chụp lỗi (không kèm dữ liệu) gửi lại. Lỗi `already exists` nghĩa là file đó đã áp trước rồi: không chạy lại, chuyển sang file sau.
-4. Kiểm tra sau áp: dán `supabase/verify_migrations.sql` vào SQL Editor, Run. Cả 16 dòng cột `dat` phải là `true`. Nếu mới áp đến 0007 thì 4 mục 0008 chưa đạt, chưa dùng ghi chú riêng; chưa áp 0009 thì 2 mục cuối chưa đạt, chưa dùng lịch hằng tuần.
-5. Trên máy chạy API: `cd apps/api && .venv/Scripts/python -m app.preflight` (Linux/macOS: `.venv/bin/python`). Phải thấy `ĐẠT migration 0004…0009` (0008 có 3 probe, 0009 có 2). Muốn có dòng máy chủ bảng đạt thì chạy `make dev-board` trước.
-6. Ghi vào `docs/progress.md`: ngày áp, kết quả bước 4 và 5.
+1. Đối chiếu lịch sử migration với sổ bàn giao. Nếu không khớp, xác định nguyên nhân trước khi áp gì thêm; không suy ra `already exists` là toàn bộ migration đã hoàn tất.
+2. Chạy `supabase/verify_migrations.sql` chỉ đọc: hiện **25 mục**, mục 1–22 cho schema đến 0010, mục 23–25 cho 0011. Nếu chưa áp 0011, ghi ba mục đó chưa đạt/chưa áp, không đánh dấu 25/25.
+3. Chạy máy chủ bảng và `python -m app.preflight` từ `apps/api` bằng venv. Ghi riêng kết quả từng probe; preflight hiện kiểm cả chức năng ngoài GĐ1 nên không gộp thiếu 0011 thành hỏng bảng ảnh.
+4. Nếu cần dùng bài tập M2.1, lập bước áp 0011 riêng khi được cho phép, có bản sao và không có buổi đang học; OCR vẫn hoãn. Không chạy trong lần hoàn thiện tài liệu này.
+5. Ghi ngày, phạm vi và kết quả thực tế vào progress; không thay cột chưa thử bằng kết quả test giả.
 
 Hoàn tác 0008 trước khi có dữ liệu: gỡ code/UI ghi chú tương ứng rồi dùng `supabase/rollback/0008_private_teaching_notes.sql`. Script từ chối nếu có bất kỳ note/chủ đề/liên kết nào; không bỏ dữ liệu thật để quay lui. Không tự gỡ 0004–0007 trong khi code phòng học/xóa dữ liệu còn dùng các cột đó.
 
@@ -66,6 +59,9 @@ Chuẩn bị: `make dev-api`, `make dev-board`, `make dev-web`; preflight đạt
 | 2.14 | Xóa khi máy chủ bảng tắt (`Ctrl+C` ở `make dev-board`), rồi bật lại | Lần đầu "Đang xóa, chưa xong" + "Xóa tiếp"; bật lại rồi bấm "Xóa tiếp" (hoặc chờ vòng lặp nền ~5 phút) thì xong | Chưa thử |
 | 2.15 | Sau 2.13–2.14, kiểm B | B vẫn đăng nhập được, buổi và bảng của B còn nguyên | Chưa thử |
 | 2.16 | Chạy lại preflight và `verify_migrations.sql` | Vẫn đạt | Chưa thử |
+| 2.18 | GV chèn ảnh JPEG/PNG/WebP trên laptop, xem trên tablet và máy A; đổi kích thước, viết lên ảnh, tải lại A | Ảnh/nét đầy đủ, giống nhau; A không có nút chèn ảnh | Chưa thử |
+| 2.19 | Kết thúc buổi có ảnh, GV/A mở Xem lại bảng; B thử truy cập bảng A | GV/A thấy ảnh và nét, B không đọc được; bảng cũ không ảnh vẫn mở được | Chưa thử |
+| 2.20 | Xóa A sau buổi có ảnh rồi kiểm dữ liệu bảng trên máy chủ và Storage | Không còn tệp ảnh/scene của A, dấu chặn phòng còn theo cơ chế purge; B không bị ảnh hưởng | Chưa thử |
 
 Mục 2.13–2.14 là lần đầu gọi Storage list/delete thật; nếu lỗi, chép mã HTTP trong log API (không chép tên học sinh).
 
@@ -132,9 +128,9 @@ Lỗi trong buổi thử: ghi giờ, máy, thao tác vừa làm, và đoạn log
   - **Kết quả kiểm thử (không phải bảo đảm):** 2026-10-20, `make test` đạt (API 128 test, gồm 21 test xác định và 400 seed ngẫu nhiên cho phòng video). Các test chỉ chứng minh code đúng **theo mô hình LiveKit giả** (thu hồi theo phòng + identity, sống qua tạo lại phòng, có hạn 660 s; thu hồi khi phòng không tồn tại không được ghi nhận). LiveKit Cloud **chưa** được kiểm theo mô hình này.
   - **G4 đã có logic cục bộ:** phòng mới có nhãn sở hữu HMAC gắn với tên phòng và môi trường, sweeper dọn được phòng tạo muộn sau xóa học sinh/buổi học. Phòng không có nhãn hợp lệ hoặc DB lỗi được giữ lại. Chưa kiểm metadata trên Cloud; giới hạn khóa/phạm vi thay đổi ở thiết kế mục 10.
   - **Kiểm tra sau hoàn tất logic G4/G10:** API **141 test đạt** (gồm 13 ca ownership/xóa bù mới và 400 seed sẵn có); board **65/65**, Ruff, typecheck và web build đạt bằng lệnh thành phần trên bản sao không chứa bí mật. Lệnh `make` lỗi khởi chạy; `npm test` board lỗi môi trường tsx, dùng Node 24 transform-types thay thế. Chi tiết lệnh/kết quả trong progress.
-  - **Vì sao vẫn mở:** (1) chưa tắt auto-create trên Cloud (production hiện vẫn tự tạo phòng, nên khi chưa deploy B2 thì lỗi y như cũ); (2) giả định về thu hồi và nhãn metadata trên Cloud chưa xác minh (T5–T8, T14; kịch bản `apps/api/scripts/livekit_dev_check.py` đã chạy offline trên mô hình, **chưa chạy trên Cloud**); (3) còn phản ví dụ theo mô hình: G2 (thu hồi hết hạn khi phòng mồ côi còn và vòng lặp nền không chạy), G9 (thu hồi lỗi rồi phòng đã xóa, lần thử lại không ghi nhận được), G11 (token máy chủ tự cấp lại). Chi tiết mục 7–8 thiết kế.
+  - **Vì sao vẫn mở (cập nhật):** Cloud đã được thử trên dự án dev; không còn coi toàn bộ T1–T14 là chưa chạy. T3/T3B cho thấy xóa phòng không chặn token chưa thu hồi. T8b xác nhận thu hồi hết hiệu lực trong khoảng 6–12 phút; token còn hạn có thể vào lại, kể cả phòng đã bị xóa. G2/G9/G11 vẫn cần giải pháp và xác minh; T4/T10 còn chưa thử. Không suy rộng cấu hình dev thành cấu hình production đã kiểm.
   - **Thử trên LiveKit Cloud (dự án hiện có, chủ dự án chỉ định làm dev, 2026-10-20):** T1, T2, T5, T6, T7, T12, T13, T14 đạt; **T3 và T3B không đạt**: xóa phòng không chặn token cũ chưa thu hồi (token vào lại và phòng xuất hiện lại dù auto-create tắt). Thu hồi chặn được, kể cả khi thu hồi lúc phòng không tồn tại (T7). T8: thu hồi giữ ít nhất 6 phút, sau đó phòng tự đóng nên chưa đo được thời hạn thật; T4, T10 chưa thử. Chi tiết: design-video-token.md mục 9.3. Lỗi **vẫn mở**.
-  - **Đóng lỗi khi:** T1, T3, T5–T8, T14 đạt trên dự án LiveKit dev riêng, chủ dự án chấp nhận hoặc xử lý G2/G4/G9/G11, và B2 đã chạy trên production với auto-create tắt.
+  - **Đóng lỗi khi:** cơ chế ứng dụng ngăn token cũ/cấp lại vào buổi đã đóng trong phạm vi yêu cầu đã chốt, có kiểm cục bộ và bằng chứng trên LiveKit dev cho reconnect muộn, API restart/ngừng, lỗi thu hồi và tạo phòng muộn. T3/T3B là hành vi nhà cung cấp đã biết, không chờ nó tự đổi thành đạt. Phải xử lý hoặc chốt rõ giới hạn G2/G4/G9/G11 và kiểm cấu hình triển khai trước pilot; xóa phòng, metadata danh tính hoặc giảm TTL riêng lẻ chưa đáp ứng điều kiện này.
 - Máy chủ bảng chưa chạy lúc preflight: chạy `make dev-board` rồi preflight lại.
 
 ## 6. Việc chủ dự án cần làm

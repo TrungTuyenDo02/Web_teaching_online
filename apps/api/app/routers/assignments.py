@@ -85,6 +85,7 @@ async def _store(
     submission: SubmissionRow,
     data: bytes,
     mime: str,
+    kind: str = "original",
 ) -> SubmissionFileRow:
     path = f"{student.id}/{submission.id}/{uuid.uuid4().hex}.{_EXT[mime]}"
     await repo.upload_submission_object(path, data, mime)
@@ -92,6 +93,7 @@ async def _store(
         {
             "submission_id": submission.id,
             "storage_path": path,
+            "kind": kind,
             "mime_type": mime,
             "size_bytes": len(data),
         }
@@ -176,7 +178,8 @@ async def add_submission_file(
     _, student, submission = await _load_submission(user, repo, submission_id, Role.student)
     if submission.status != SubmissionStatus.submitted:
         raise HTTPException(409, "Thầy cô đã bắt đầu chấm bài này, không thêm ảnh được.")
-    if len(await repo.list_submission_files(submission.id)) >= settings.submission_max_files:
+    files = await repo.list_submission_files(submission.id)
+    if sum(f.kind == "original" for f in files) >= settings.submission_max_files:
         raise HTTPException(409, f"Mỗi bài nộp tối đa {settings.submission_max_files} ảnh.")
     data, mime = await _read_image(request, settings)
     return await _store(repo, student, submission, data, mime)
@@ -201,7 +204,8 @@ async def ocr_submission(
             409,
             "Chưa ghi nhận phụ huynh đồng ý cho lưu dữ liệu học tập, nên chưa gửi ảnh cho AI đọc.",
         )
-    files = await repo.list_submission_files(submission.id)
+    # Chỉ ảnh gốc của học sinh; ảnh thầy cô chữa không gửi cho AI
+    files = [f for f in await repo.list_submission_files(submission.id) if f.kind == "original"]
     if not files:
         raise HTTPException(409, "Bài nộp chưa có ảnh.")
     allowed = await repo.reserve_assistant_turn(
@@ -240,6 +244,55 @@ async def ocr_submission(
     return row
 
 
+@router.post(
+    "/submissions/{submission_id}/annotations", response_model=SubmissionFileRow, status_code=201
+)
+async def annotate_submission(
+    submission_id: UUID,
+    request: Request,
+    user: AuthUser = Depends(get_current_user),
+    repo: Repository = Depends(get_repo),
+    settings: Settings = Depends(get_settings),
+):
+    """Giáo viên lưu ảnh chữa bài (ảnh bài làm đã viết đè bằng bút); học sinh thấy khi bài được trả.
+
+    Thân request là ảnh JPEG/PNG/WebP. Lưu ảnh chữa đầu tiên thì bài chuyển sang đang chấm.
+    """
+    _, student, submission = await _load_submission(user, repo, submission_id, Role.teacher)
+    files = await repo.list_submission_files(submission.id)
+    if sum(f.kind == "annotated" for f in files) >= settings.submission_max_files:
+        raise HTTPException(409, f"Mỗi bài nộp tối đa {settings.submission_max_files} ảnh chữa.")
+    data, mime = await _read_image(request, settings)
+    row = await _store(repo, student, submission, data, mime, kind="annotated")
+    await repo.update_submission(
+        submission.id, {"status": SubmissionStatus.reviewing}, SubmissionStatus.submitted
+    )
+    return row
+
+
+@router.delete("/submissions/{submission_id}/files/{file_id}", status_code=204)
+async def delete_annotation(
+    submission_id: UUID,
+    file_id: UUID,
+    user: AuthUser = Depends(get_current_user),
+    repo: Repository = Depends(get_repo),
+):
+    """Giáo viên xóa một ảnh chữa của bài nộp. Ảnh bài làm gốc của học sinh không xóa được."""
+    _, _, submission = await _load_submission(user, repo, submission_id, Role.teacher)
+    file = next(
+        (f for f in await repo.list_submission_files(submission.id) if f.id == str(file_id)), None
+    )
+    if file is None:
+        raise HTTPException(404, "Không tìm thấy ảnh")
+    if file.kind != "annotated":
+        raise HTTPException(
+            409, "Chỉ xóa được ảnh thầy cô chữa, không xóa ảnh bài làm của học sinh."
+        )
+    # Xóa hàng trước: tệp còn sót trong Storage vẫn được dọn khi xóa hẳn học sinh (purge thư mục)
+    await repo.delete_submission_file(file.id)
+    await repo.delete_submission_object(file.storage_path)
+
+
 @router.post("/submissions/{submission_id}/return", response_model=SubmissionRow)
 async def return_submission(
     submission_id: UUID,
@@ -247,7 +300,10 @@ async def return_submission(
     user: AuthUser = Depends(get_current_user),
     repo: Repository = Depends(get_repo),
 ):
-    """Giáo viên trả bài: nhận xét và điểm (0–10, tùy chọn); trả lại lần nữa thì sửa nhận xét."""
+    """Giáo viên trả bài: nhận xét và điểm (0–10, tùy chọn); trả lại lần nữa thì sửa nhận xét.
+
+    redo=true: yêu cầu làm lại; học sinh đọc nhận xét và nộp lượt mới cho cùng bài tập.
+    """
     _, _, submission = await _load_submission(user, repo, submission_id, Role.teacher)
     updated = await repo.update_submission(
         submission.id,
@@ -261,7 +317,6 @@ async def return_submission(
     if updated is None:
         raise HTTPException(404, "Không tìm thấy bài nộp")
     if submission.assignment_id:
-        await repo.update_assignment(
-            submission.assignment_id, {"status": AssignmentStatus.returned}
-        )
+        status = AssignmentStatus.assigned if body.redo else AssignmentStatus.returned
+        await repo.update_assignment(submission.assignment_id, {"status": status})
     return updated

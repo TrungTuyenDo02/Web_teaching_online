@@ -1,10 +1,12 @@
-import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
+import { CaptureUpdateAction, convertToExcalidrawElements, Excalidraw, exportToBlob, viewportCoordsToSceneCoords } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { useEffect, useState } from "react";
+import type { FileId } from "@excalidraw/excalidraw/element/types";
+import { useEffect, useRef, useState } from "react";
 import "@excalidraw/excalidraw/index.css";
 import { useBoardSync, type BoardActivity, type BoardStatus } from "../hooks/useBoardSync";
 import { lang, t } from "../lib/i18n";
 import { Button } from "../ui/Button";
+import { prepareBoardImage } from "../lib/boardImage";
 
 interface Props {
   url: string;
@@ -31,8 +33,28 @@ const statusText: Record<BoardStatus, string> = {
 };
 
 export default function Whiteboard({ url, token, readOnly = false, onEnded, onActivity, onApi }: Props) {
-  const { api, setApi, onChange, status, peers } = useBoardSync({ url, token, onActivity });
+  const { api, setApi, onChange, status, peers, images, uploadFile } = useBoardSync({ url, token, onActivity });
   const [exportError, setExportError] = useState("");
+  const [imageError, setImageError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const imageInput = useRef<HTMLInputElement>(null);
+
+  async function insertImage(file: File) {
+    if (!api || readOnly || status !== "online" || !images || uploading) return;
+    setUploading(true); setImageError("");
+    try {
+      const prepared = await prepareBoardImage(file);
+      const uploaded = await uploadFile(prepared);
+      const state = api.getAppState();
+      const point = viewportCoordsToSceneCoords({ clientX: state.offsetLeft + state.width / 2, clientY: state.offsetTop + state.height / 2 }, state);
+      const width = Math.min(prepared.width, 600 / state.zoom.value);
+      const height = width * prepared.height / prepared.width;
+      const elements = convertToExcalidrawElements([{ type: "image", fileId: uploaded.id as FileId, x: point.x - width / 2, y: point.y - height / 2, width, height, status: "saved", scale: [1, 1] }]);
+      api.updateScene({ elements: [...api.getSceneElementsIncludingDeleted(), ...elements], captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+    } catch (error) {
+      setImageError(t(error instanceof Error ? error.message : "Chưa lưu được ảnh. Hãy thử lại."));
+    } finally { setUploading(false); }
+  }
 
   useEffect(() => {
     if (api) onApi?.(api);
@@ -73,6 +95,15 @@ export default function Whiteboard({ url, token, readOnly = false, onEnded, onAc
         <span role="status">{t(statusText[status])}</span>
         <span className="muted">· {t("{n} thiết bị", { n: peers })}</span>
         {readOnly && <span className="muted">· {t("Chỉ xem")}</span>}
+        {!readOnly && <>
+          <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={event => {
+            const file = event.currentTarget.files?.[0]; event.currentTarget.value = "";
+            if (file) void insertImage(file);
+          }} />
+          <Button size="sm" disabled={!api || !images || status !== "online" || uploading} onClick={() => imageInput.current?.click()}>
+            {uploading ? t("Đang tải ảnh…") : t("Chèn ảnh đề bài")}
+          </Button>
+        </>}
         <Button size="sm" onClick={() => void downloadPng()} disabled={!api}>
           {t("Tải ảnh bảng")}
         </Button>
@@ -81,6 +112,7 @@ export default function Whiteboard({ url, token, readOnly = false, onEnded, onAc
             {exportError}
           </span>
         )}
+        {imageError && <span role="alert" className="board__error">{imageError}</span>}
       </div>
       <div className="board__canvas">
         <Excalidraw
@@ -94,7 +126,7 @@ export default function Whiteboard({ url, token, readOnly = false, onEnded, onAc
           }}
           UIOptions={{
             canvasActions: { loadScene: false, saveToActiveFile: false, toggleTheme: false },
-            tools: { image: false }, // ảnh chưa được đồng bộ (useBoardSync gỡ ảnh dán/kéo thả vào)
+            tools: { image: false }, // dùng nút riêng để kiểm ảnh và chờ ACK; chặn đường chèn trực tiếp
           }}
         />
       </div>

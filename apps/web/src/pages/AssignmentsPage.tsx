@@ -1,52 +1,81 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { backend, errorMessage, type AssignmentItem, type SubmissionItem } from "../lib/data";
+import type { SubmissionFile } from "../lib/api";
 import { useAsync, useNow } from "../lib/hooks";
 import { t } from "../lib/i18n";
 import { formatDateTime } from "../lib/schedule";
 import { AppShell } from "../ui/AppShell";
 import { Badge, type BadgeTone } from "../ui/Badge";
 import { Button } from "../ui/Button";
-import { Dialog } from "../ui/Dialog";
+import { ConfirmDialog, Dialog } from "../ui/Dialog";
 import { Field } from "../ui/Field";
 import { Alert, Empty, ErrorState, Loading, useToast } from "../ui/Feedback";
 import { PageHeader } from "../ui/PageHeader";
 import { Window } from "../ui/Window";
 
-const STATUS: Record<AssignmentItem["status"], [BadgeTone, string]> = {
+// Excalidraw nặng: chỉ tải khi giáo viên bấm Chữa trên ảnh
+const SubmissionAnnotator = lazy(() => import("../components/SubmissionAnnotator"));
+
+type AssignmentState = AssignmentItem["status"] | "redo";
+
+/** "Cần làm lại": API mở lại bài (assigned) sau khi trả một lượt nộp kèm yêu cầu làm lại. */
+export function assignmentState(item: AssignmentItem): AssignmentState {
+  return item.status === "assigned" && item.submissions.length > 0 ? "redo" : item.status;
+}
+
+const STATUS: Record<AssignmentState, [BadgeTone, string]> = {
   assigned: ["scheduled", "Chưa nộp"],
+  redo: ["warn", "Cần làm lại"],
   submitted: ["live", "Đã nộp"],
   returned: ["done", "Đã trả"],
 };
 
-export function AssignmentStatus({ status }: { status: AssignmentItem["status"] }) {
-  const [tone, label] = STATUS[status];
+export function AssignmentStatus({ item }: { item: AssignmentItem }) {
+  const [tone, label] = STATUS[assignmentState(item)];
   return <Badge tone={tone}>{t(label)}</Badge>;
 }
 
-/** Ảnh bài làm: URL ký 10 phút qua Storage RLS; bấm mở cỡ đầy đủ ở tab mới. */
-export function SubmissionImages({ submission }: { submission: SubmissionItem }) {
-  const [urls, setUrls] = useState<(string | null)[]>([]);
+/** Ảnh bài làm (gốc hoặc ảnh thầy cô chữa): URL ký 10 phút qua Storage RLS; bấm mở cỡ đầy đủ ở tab mới. */
+export function SubmissionImages({
+  submission,
+  kind = "original",
+  actions,
+}: {
+  submission: SubmissionItem;
+  kind?: SubmissionFile["kind"];
+  /** Nút riêng cho từng ảnh (giáo viên: chữa, xóa ảnh chữa). */
+  actions?: (file: SubmissionFile, url: string, name: string) => ReactNode;
+}) {
+  const [urls, setUrls] = useState<Record<string, string | null>>({});
   useEffect(() => {
     let alive = true;
-    void Promise.all(submission.files.map((f) => backend.submissionImageUrl(f.storage_path).catch(() => null))).then((next) => alive && setUrls(next));
+    void Promise.all(
+      submission.files.map(async (f) => [f.id, await backend.submissionImageUrl(f.storage_path).catch(() => null)] as const),
+    ).then((pairs) => alive && setUrls(Object.fromEntries(pairs)));
     return () => {
       alive = false;
     };
   }, [submission.files]);
+  const files = submission.files.filter((f) => f.kind === kind);
   return (
     <ul className="work-images">
-      {submission.files.map((file, i) => (
-        <li key={file.id}>
-          {urls[i] ? (
-            <a href={urls[i]!} target="_blank" rel="noreferrer">
-              <img src={urls[i]!} alt={t("Ảnh bài làm {n}", { n: i + 1 })} loading="lazy" />
-            </a>
-          ) : (
-            <span className="muted">{urls.length ? t("Không tải được ảnh {n}", { n: i + 1 }) : t("Đang tải ảnh…")}</span>
-          )}
-        </li>
-      ))}
+      {files.map((file, i) => {
+        const url = urls[file.id];
+        const name = kind === "original" ? t("Ảnh bài làm {n}", { n: i + 1 }) : t("Ảnh thầy cô chữa {n}", { n: i + 1 });
+        return (
+          <li key={file.id}>
+            {url ? (
+              <a href={url} target="_blank" rel="noreferrer">
+                <img src={url} alt={name} loading="lazy" />
+              </a>
+            ) : (
+              <span className="muted">{url === null ? t("Không tải được ảnh {n}", { n: i + 1 }) : t("Đang tải ảnh…")}</span>
+            )}
+            {url && actions?.(file, url, name)}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -113,8 +142,39 @@ function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onCl
   const [transcript, setTranscript] = useState(submission?.transcripts[0]?.content ?? null);
   const [comment, setComment] = useState(submission?.teacher_comment ?? "");
   const [score, setScore] = useState(submission?.score == null ? "" : String(submission.score));
-  const [busy, setBusy] = useState<"ocr" | "return" | null>(null);
+  const [busy, setBusy] = useState<"ocr" | "return" | "redo" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [annotating, setAnnotating] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<SubmissionFile | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const annotated = submission?.files.filter((f) => f.kind === "annotated") ?? [];
+
+  async function saveAnnotation(image: Blob) {
+    if (!submission) return;
+    await backend.annotateSubmission(submission.id, image);
+    toast.success(t("Đã lưu ảnh chữa."));
+    setAnnotating(null);
+    onChanged();
+  }
+  async function removeAnnotation() {
+    if (!submission || !removing) return;
+    setRemoveBusy(true); setRemoveError(null);
+    try {
+      await backend.deleteAnnotation(submission.id, removing.id);
+      setRemoving(null);
+      onChanged();
+    } catch (err) {
+      setRemoveError(errorMessage(err, "Không xóa được ảnh chữa."));
+    } finally {
+      setRemoveBusy(false);
+    }
+  }
+  const annotateButton = (label: string) => (_file: SubmissionFile, url: string, name: string) => (
+    <Button size="sm" onClick={() => setAnnotating(url)} disabled={busy !== null} aria-label={`${label}: ${name}`}>
+      {label}
+    </Button>
+  );
 
   async function readWithAI() {
     if (!submission) return;
@@ -128,13 +188,14 @@ function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onCl
       setBusy(null);
     }
   }
-  async function giveBack(event: FormEvent) {
+  async function giveBack(event: FormEvent, redo = false) {
     event.preventDefault();
     if (!submission) return;
-    setBusy("return"); setError(null);
+    if (redo && !comment.trim()) return setError(t("Hãy viết nhận xét để học sinh biết cần sửa gì."));
+    setBusy(redo ? "redo" : "return"); setError(null);
     try {
-      await backend.returnSubmission(submission.id, { teacher_comment: comment, score: score === "" ? null : Number(score) });
-      toast.success(t("Đã trả bài cho {name}.", { name: item.student_name }));
+      await backend.returnSubmission(submission.id, { teacher_comment: comment, score: score === "" ? null : Number(score), redo });
+      toast.success(redo ? t("Đã gửi yêu cầu làm lại cho {name}.", { name: item.student_name }) : t("Đã trả bài cho {name}.", { name: item.student_name }));
       onChanged();
       onClose();
     } catch (err) {
@@ -151,7 +212,25 @@ function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onCl
       ) : (
         <div className="stack">
           <p className="muted">{t("{name} nộp lúc {when}", { name: item.student_name, when: formatDateTime(submission.submitted_at, new Date()) })}</p>
-          <SubmissionImages submission={submission} />
+          <SubmissionImages submission={submission} actions={annotateButton(t("Chữa trên ảnh"))} />
+          {annotated.length > 0 && (
+            <section className="stack" aria-labelledby="annotated-title">
+              <h3 id="annotated-title">{t("Ảnh thầy cô chữa")}</h3>
+              <p className="muted">{t("Học sinh thấy các ảnh này khi thầy cô trả bài.")}</p>
+              <SubmissionImages
+                submission={submission}
+                kind="annotated"
+                actions={(file, url, name) => (
+                  <div className="btn-row">
+                    {annotateButton(t("Chữa tiếp"))(file, url, name)}
+                    <Button size="sm" variant="danger" onClick={() => { setRemoveError(null); setRemoving(file); }} disabled={busy !== null} aria-label={`${t("Xóa ảnh chữa")}: ${name}`}>
+                      {t("Xóa ảnh chữa")}
+                    </Button>
+                  </div>
+                )}
+              />
+            </section>
+          )}
           <section className="stack" aria-labelledby="ocr-title">
             <h3 id="ocr-title">{t("AI đọc bài (gợi ý cho thầy cô)")}</h3>
             {transcript ? (
@@ -175,11 +254,36 @@ function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onCl
             {error && <Alert tone="error">{error}</Alert>}
             <div className="btn-row btn-row--end">
               <Button onClick={onClose} disabled={busy !== null}>{t("Đóng")}</Button>
+              <Button onClick={(e) => void giveBack(e, true)} busy={busy === "redo"} disabled={busy !== null}>
+                {t("Yêu cầu làm lại")}
+              </Button>
               <Button type="submit" variant="primary" busy={busy === "return"} disabled={busy !== null}>{t("Trả bài")}</Button>
             </div>
           </form>
         </div>
       )}
+      {annotating && (
+        <Suspense fallback={null}>
+          <SubmissionAnnotator
+            imageUrl={annotating}
+            title={t("Chữa bài · {title}", { title: item.title })}
+            onSave={saveAnnotation}
+            onClose={() => setAnnotating(null)}
+          />
+        </Suspense>
+      )}
+      <ConfirmDialog
+        open={removing !== null}
+        title={t("Xóa ảnh chữa?")}
+        confirmLabel={t("Xóa ảnh chữa")}
+        danger
+        busy={removeBusy}
+        error={removeError}
+        onConfirm={() => void removeAnnotation()}
+        onClose={() => setRemoving(null)}
+      >
+        {t("Ảnh chữa này sẽ bị xóa hẳn, học sinh không xem được nữa. Ảnh bài làm gốc vẫn giữ nguyên.")}
+      </ConfirmDialog>
     </Dialog>
   );
 }
@@ -189,7 +293,8 @@ function TeacherAssignments() {
   const now = useNow();
   const list = useAsync(() => backend.listAssignments(), "Không tải được danh sách bài tập.");
   const [assigning, setAssigning] = useState(false);
-  const [reviewing, setReviewing] = useState<AssignmentItem | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const reviewing = list.data?.find((a) => a.id === reviewingId) ?? null; // lấy bản mới sau khi tải lại
 
   return (
     <>
@@ -211,17 +316,17 @@ function TeacherAssignments() {
               <li key={item.id} className="item">
                 <div className="item__top">
                   <span className="item__title" id={`assignment-${item.id}`}>{item.title}</span>
-                  <AssignmentStatus status={item.status} />
+                  <AssignmentStatus item={item} />
                 </div>
                 <div className="item__meta">
                   <span>{t("Học sinh: {name}", { name: item.student_name || "—" })}</span>
                   {item.due_at && <span>{t("Hạn nộp: {when}", { when: formatDateTime(item.due_at, now) })}</span>}
-                  {item.submissions[0] && <span>{t("{n} ảnh", { n: item.submissions[0].files.length })}</span>}
+                  {item.submissions[0] && <span>{t("{n} ảnh", { n: item.submissions[0].files.filter((f) => f.kind === "original").length })}</span>}
                 </div>
                 {item.submissions[0] && (
                   <div className="btn-row">
-                    <Button size="sm" variant={item.status === "submitted" ? "primary" : undefined} onClick={() => setReviewing(item)} aria-describedby={`assignment-${item.id}`}>
-                      {item.status === "returned" ? t("Xem lại bài nộp") : t("Xem và chấm")}
+                    <Button size="sm" variant={item.status === "submitted" ? "primary" : undefined} onClick={() => setReviewingId(item.id)} aria-describedby={`assignment-${item.id}`}>
+                      {item.status === "submitted" ? t("Xem và chấm") : t("Xem lại bài nộp")}
                     </Button>
                   </div>
                 )}
@@ -239,7 +344,7 @@ function TeacherAssignments() {
           void list.reload();
         }}
       />
-      {reviewing && <ReviewDialog item={reviewing} onClose={() => setReviewing(null)} onChanged={() => void list.reload()} />}
+      {reviewing && <ReviewDialog item={reviewing} onClose={() => setReviewingId(null)} onChanged={() => void list.reload()} />}
     </>
   );
 }

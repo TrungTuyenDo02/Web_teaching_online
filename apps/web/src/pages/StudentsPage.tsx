@@ -4,7 +4,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { backend, errorMessage, errorText, type Student } from "../lib/data";
 import { useAsync } from "../lib/hooks";
 import { AppShell } from "../ui/AppShell";
-import { Button } from "../ui/Button";
+import { Button, ButtonLink } from "../ui/Button";
 import { ConfirmDialog, Dialog } from "../ui/Dialog";
 import { Badge } from "../ui/Badge";
 import { Check } from "../ui/Check";
@@ -203,6 +203,9 @@ function StudentsManager() {
                 ) : (
                   <>
                     <div className="btn-row">
+                      <ButtonLink size="sm" to={`/students/${s.id}`} aria-describedby={`student-${s.id}`}>
+                        {t("Xem hồ sơ")}
+                      </ButtonLink>
                       <Button size="sm" onClick={() => setEditing({ student: s })} aria-describedby={`student-${s.id}`}>
                         {t("Sửa hồ sơ")}
                       </Button>

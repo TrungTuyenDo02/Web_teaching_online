@@ -38,6 +38,7 @@ from app.models import (  # noqa: E402
     WeeklySlot,
 )
 from app.repo import AuthAdminError, get_repo  # noqa: E402
+from app.services.board_document import BoardSnapshot  # noqa: E402
 
 TEACHER_ID = "11111111-1111-1111-1111-111111111111"
 STUDENT_PROFILE_ID = "22222222-2222-2222-2222-222222222222"
@@ -120,7 +121,7 @@ class FakeRepo:
         self.fail_link = False
         self.passwords: dict[str, str] = {}  # user_id -> mật khẩu đặt lại
         self.attendance_closed: dict[str, datetime] = {}  # session_id -> left_at
-        self.board_files: dict[str, list[dict]] = {}  # đường dẫn trong bucket boards -> nội dung
+        self.board_files: dict[str, BoardSnapshot] = {}  # đường dẫn trong bucket boards -> nội dung
         self.fail_board_upload = False
         self.submission_files: dict[str, bytes] = {}  # đường dẫn trong bucket submissions
         self.assignments: dict[str, AssignmentRow] = {}
@@ -199,6 +200,9 @@ class FakeRepo:
         row = SubmissionFileRow(id=str(uuid.uuid4()), **fields)
         self.submission_rows.append(row)
         return row
+
+    async def delete_submission_file(self, file_id: str) -> None:
+        self.submission_rows = [f for f in self.submission_rows if f.id != file_id]
 
     async def upload_submission_object(self, path: str, data: bytes, mime: str) -> None:
         if path in self.submission_files:
@@ -510,7 +514,7 @@ class FakeRepo:
         }
 
     async def save_board_snapshot(
-        self, student_id: str, session_id: str, elements: list[dict]
+        self, student_id: str, session_id: str, elements: BoardSnapshot
     ) -> str:
         if self.upload_gate is not None:
             if self.upload_waiting is not None:
@@ -861,7 +865,7 @@ class RoomCloser:
         self.purged: list[str] = []  # buổi học đã xóa dữ liệu bảng (xóa học sinh)
         self.fail_purge = False
         self.fail_whiteboard = False
-        self.board_elements: list[dict] = []  # nội dung bảng cuối máy chủ bảng trả về
+        self.board_elements: BoardSnapshot = []  # nội dung bảng cuối máy chủ bảng trả về
 
     @property
     def livekit(self) -> list[str]:
@@ -875,7 +879,7 @@ class RoomCloser:
     def fail_livekit(self, value: bool) -> None:
         self.lk.fail = {"create", "delete", "revoke", "list"} if value else set()
 
-    async def close_whiteboard(self, _settings: Settings, session_id: str) -> list[dict]:
+    async def close_whiteboard(self, _settings: Settings, session_id: str) -> BoardSnapshot:
         if self.fail_whiteboard:
             raise RuntimeError("whiteboard-sync không trả lời")
         self.whiteboard.append(session_id)

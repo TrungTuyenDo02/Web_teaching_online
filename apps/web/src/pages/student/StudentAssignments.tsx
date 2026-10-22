@@ -9,7 +9,7 @@ import { Dialog } from "../../ui/Dialog";
 import { Field } from "../../ui/Field";
 import { Alert, Empty, ErrorState, Loading, useToast } from "../../ui/Feedback";
 import { Window } from "../../ui/Window";
-import { AssignmentStatus } from "../AssignmentsPage";
+import { AssignmentStatus, assignmentState, SubmissionImages } from "../AssignmentsPage";
 
 const MAX_FILES = 6;
 
@@ -89,22 +89,29 @@ export function StudentAssignments() {
               <li key={item.id} className="item">
                 <div className="item__top">
                   <span className="item__title" id={`homework-${item.id}`}>{item.title}</span>
-                  <AssignmentStatus status={item.status} />
+                  <AssignmentStatus item={item} />
                 </div>
                 {item.description && <p className="prose-text">{item.description}</p>}
                 <div className="item__meta">
                   {item.due_at && <span>{t("Hạn nộp: {when}", { when: formatDateTime(item.due_at, now) })}</span>}
-                  {latest && <span>{t("Đã nộp {n} ảnh lúc {when}", { n: latest.files.length, when: formatDateTime(latest.submitted_at, now) })}</span>}
+                  {latest && <span>{t("Đã nộp {n} ảnh lúc {when}", { n: latest.files.filter((f) => f.kind === "original").length, when: formatDateTime(latest.submitted_at, now) })}</span>}
                 </div>
                 {latest?.status === "returned" && (
                   <div className="homework">
+                    {assignmentState(item) === "redo" && <p><strong>{t("Thầy cô yêu cầu em làm lại bài này. Đọc nhận xét rồi nộp lại nhé.")}</strong></p>}
                     {latest.score != null && <p><strong>{t("Điểm: {score}/10", { score: latest.score })}</strong></p>}
                     {latest.teacher_comment && <p className="prose-text">{latest.teacher_comment}</p>}
+                    {latest.files.some((f) => f.kind === "annotated") && (
+                      <>
+                        <p><strong>{t("Bài thầy cô chữa")}</strong></p>
+                        <SubmissionImages submission={latest} kind="annotated" />
+                      </>
+                    )}
                   </div>
                 )}
                 {item.status !== "returned" && (
                   <div className="btn-row">
-                    <Button size="sm" variant={latest ? undefined : "primary"} onClick={() => setSubmitting(item)} aria-describedby={`homework-${item.id}`}>
+                    <Button size="sm" variant={!latest || assignmentState(item) === "redo" ? "primary" : undefined} onClick={() => setSubmitting(item)} aria-describedby={`homework-${item.id}`}>
                       {latest ? t("Nộp lại") : t("Nộp bài")}
                     </Button>
                   </div>

@@ -2,18 +2,22 @@
  * Giao thức với máy chủ whiteboard-sync, tách khỏi React và Excalidraw để test được với máy chủ thật
  * (services/whiteboard-sync/test/client.test.ts). Không import gì ngoài API chuẩn của trình duyệt.
  */
+import { IMAGE_CHUNK_SIZE, IMAGE_ID, IMAGE_MAX_BYTES, readBoardFile, type BoardFile } from "./boardFiles.ts";
 
 export interface SyncElement {
   id: string;
   version: number;
   versionNonce: number;
   type?: string;
+  fileId?: string | null;
 }
 
 /** Bảng ở máy này: đọc mọi phần tử (kể cả đã xóa) và gộp phần tử nhận từ máy chủ. */
 export interface BoardScene {
   elements(): readonly SyncElement[];
   applyRemote(remote: SyncElement[]): void;
+  files?(): Record<string, BoardFile>;
+  applyFiles?(files: BoardFile[]): void;
 }
 
 // preview: không có máy chủ bảng (chế độ xem trước bằng dữ liệu minh họa, bản development)
@@ -28,6 +32,8 @@ export interface BoardEvents {
   onPeers(count: number): void;
   /** Tùy chọn, chỉ để hiển thị/kiểm tra (trang thử /dev/whiteboard); không ảnh hưởng giao thức. */
   onActivity?(activity: BoardActivity): void;
+  onImages?(supported: boolean): void;
+  onFileError?(message: string): void;
 }
 
 // Máy chủ đóng kết nối khi một tin quá 2.000 phần tử hoặc 5 MB: chia lô nhỏ hơn hẳn
@@ -51,8 +57,8 @@ export const HANDSHAKE_TIMEOUT_MS = 10_000;
 // Phiên bản đầy đủ: cùng version mà khác versionNonce (hai máy sửa cùng lúc) vẫn là khác nhau
 const versionKey = (el: SyncElement) => `${el.version}:${el.versionNonce}`;
 
-/** Ảnh cần đồng bộ cả `files` (chưa làm): không gửi phần tử ảnh. */
-export const isSyncable = (el: SyncElement) => el.type !== "image";
+/** Ảnh cần file id hợp lệ; flush còn kiểm file đã có trên máy chủ cùng phòng. */
+export const isSyncable = (el: SyncElement) => el.type !== "image" || (typeof el.fileId === "string" && IMAGE_ID.test(el.fileId));
 
 /** Chia phần tử thành các tin `update` vừa giới hạn; phần tử một mình đã quá giới hạn bị bỏ ra. */
 export function toBatches(
@@ -105,6 +111,12 @@ export interface ConnectionOptions {
  * - 4401 (token hết hạn/sai) và 4410 (buổi đã kết thúc) thì dừng, không thử lại.
  */
 export class BoardConnection {
+  private imageSupport = false;
+  private serverFiles = new Set<string>();
+  private waitingImages = new Map<string, SyncElement>();
+  private incomingFiles = new Map<string, { data: string; total: number; mimeType: string; created: number }>();
+  private restoring = false;
+  private upload: { id: string; mimeType: string; dataURL: string; resolve(file: BoardFile): void; reject(error: Error): void; timeout: ReturnType<typeof setTimeout>; sendTimer?: ReturnType<typeof setTimeout> } | undefined;
   private socket: WebSocket | null = null;
   private authed = false; // socket hiện tại đã nhận init
   private status: BoardStatus | undefined;
@@ -169,9 +181,18 @@ export class BoardConnection {
     const socket = this.socket;
     // Chưa xác thực: không gửi (máy chủ chỉ nhận auth là tin đầu tiên); init sẽ gọi flush
     if (!socket || !this.authed || socket.readyState !== WebSocket.OPEN) return;
+    const all = this.scene.elements();
+    const missing = all.filter(el => el.type === "image" && el.fileId && !this.serverFiles.has(el.fileId));
+    if (missing.length && this.imageSupport && !this.upload && !this.restoring) {
+      this.restoring = true;
+      const files = this.scene.files?.() ?? {};
+      void (async () => {
+        for (const id of new Set(missing.map(el => el.fileId!))) if (files[id]) await this.uploadFile(files[id]!);
+      })().catch(() => this.events.onFileError?.("Chưa đồng bộ được ảnh. Hãy thử lại khi có mạng.")).finally(() => { this.restoring = false; });
+    }
     const pending = this.scene
       .elements()
-      .filter((el) => isSyncable(el) && this.sent.get(el.id) !== versionKey(el));
+      .filter((el) => isSyncable(el) && (el.type !== "image" || this.serverFiles.has(el.fileId!)) && this.sent.get(el.id) !== versionKey(el));
     if (pending.length === 0) return;
     const { batches, oversized } = toBatches(pending);
     for (const el of oversized) {
@@ -188,6 +209,66 @@ export class BoardConnection {
       socket.send(JSON.stringify({ type: "update", elements: batch }));
       for (const el of batch) this.sent.set(el.id, versionKey(el));
       this.events.onActivity?.({ kind: "sent", elements: batch });
+    }
+  }
+
+  /** Không cần crypto.subtle (không có trên trang LAN HTTP): máy chủ tính hash và trả id bền. */
+  uploadFile(file: Pick<BoardFile, "mimeType" | "dataURL">): Promise<BoardFile> {
+    const socket = this.socket;
+    if (!socket || !this.authed || this.status !== "online" || !this.imageSupport || this.upload) return Promise.reject(new Error("Chưa sẵn sàng tải ảnh. Hãy thử lại khi bảng đã kết nối."));
+    const prefix = `data:${file.mimeType};base64,`;
+    const data = file.dataURL.startsWith(prefix) ? file.dataURL.slice(prefix.length) : "";
+    if (!data.length || data.length > Math.ceil(IMAGE_MAX_BYTES / 3) * 4) return Promise.reject(new Error("Ảnh quá lớn. Hãy chọn ảnh khác."));
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => this.rejectUpload("Tải ảnh quá lâu. Hãy thử lại."), 45_000);
+      const upload = { id, mimeType: file.mimeType, dataURL: file.dataURL, resolve, reject, timeout, sendTimer: undefined as ReturnType<typeof setTimeout> | undefined };
+      this.upload = upload;
+      let offset = 0;
+      const next = () => {
+        if (this.upload !== upload || this.socket !== socket || !this.authed) return;
+        if (socket.bufferedAmount > 512 * 1024) { upload.sendTimer = setTimeout(next, 50); return; }
+        const chunk = data.slice(offset, offset + IMAGE_CHUNK_SIZE);
+        socket.send(JSON.stringify({ type: "file_chunk", uploadId: id, mimeType: file.mimeType, offset, total: data.length, data: chunk }));
+        offset += chunk.length;
+        if (offset < data.length) upload.sendTimer = setTimeout(next, 0);
+      };
+      next();
+    });
+  }
+
+  private rejectUpload(message: string): void {
+    const upload = this.upload; this.upload = undefined;
+    if (!upload) return;
+    clearTimeout(upload.timeout); clearTimeout(upload.sendTimer); upload.reject(new Error(message));
+  }
+
+  private fileMessage(msg: Record<string, unknown>): void {
+    if (msg.type === "file_ack") {
+      const upload = this.upload;
+      if (!upload || msg.uploadId !== upload.id) return;
+      const file = readBoardFile({ id: msg.id, mimeType: upload.mimeType, dataURL: upload.dataURL, created: msg.created });
+      clearTimeout(upload.timeout); clearTimeout(upload.sendTimer); this.upload = undefined;
+      this.serverFiles.add(file.id); this.scene.applyFiles?.([file]); upload.resolve(file); this.flush();
+    } else if (msg.type === "file_error") {
+      if (msg.uploadId === this.upload?.id) this.rejectUpload(typeof msg.message === "string" ? msg.message : "Chưa lưu được ảnh. Hãy thử lại.");
+    } else if (msg.type === "file_data") {
+      const id = String(msg.id);
+      if (!IMAGE_ID.test(id) || !Number.isInteger(msg.total) || Number(msg.total) > Math.ceil(IMAGE_MAX_BYTES / 3) * 4 || Number(msg.total) <= 0 || typeof msg.data !== "string" || !msg.data.length || msg.data.length > IMAGE_CHUNK_SIZE) throw new Error("bad image chunk");
+      let incoming = this.incomingFiles.get(id);
+      if (!incoming) {
+        if (this.incomingFiles.size >= 20 || msg.offset !== 0) throw new Error("bad image offset");
+        incoming = { data: "", total: Number(msg.total), mimeType: String(msg.mimeType), created: Number(msg.created) }; this.incomingFiles.set(id, incoming);
+      }
+      if (msg.offset !== incoming.data.length || msg.total !== incoming.total || msg.mimeType !== incoming.mimeType || incoming.data.length + msg.data.length > incoming.total) throw new Error("bad image chunk");
+      incoming.data += msg.data;
+      if (incoming.data.length === incoming.total) {
+        const file = readBoardFile({ id, mimeType: incoming.mimeType, created: incoming.created, dataURL: `data:${incoming.mimeType};base64,${incoming.data}` });
+        this.incomingFiles.delete(id); this.scene.applyFiles?.([file]); this.serverFiles.add(id);
+        const ready = [...this.waitingImages.values()].filter(el => this.scene.files?.()[el.fileId!] !== undefined);
+        for (const el of ready) this.waitingImages.delete(el.id);
+        if (ready.length) this.receive(ready, "update");
+      }
     }
   }
 
@@ -217,11 +298,16 @@ export class BoardConnection {
     socket.onmessage = (event) => {
       if (this.socket !== socket) return; // socket đã bị thay: bỏ qua phản hồi muộn
       const msg = JSON.parse(String(event.data)) as {
+        [key: string]: unknown;
         type: string;
         elements?: SyncElement[];
         peers?: number;
         count?: number;
       };
+      if (["file_ack", "file_error", "file_data"].includes(msg.type)) {
+        try { this.fileMessage(msg); } catch { this.lost(socket); }
+        return;
+      }
       if (msg.type === "init") {
         clearTimeout(this.handshakeTimer);
         this.authed = true;
@@ -232,6 +318,9 @@ export class BoardConnection {
         this.events.onPeers(msg.peers ?? 1);
         // Quên "đã gửi" của lần kết nối trước: chỉ tin những gì máy chủ thật sự đang có
         this.sent = new Map();
+        this.imageSupport = msg.images === true;
+        this.events.onImages?.(this.imageSupport);
+        this.serverFiles = new Set(Array.isArray(msg.fileIds) ? msg.fileIds.filter((id): id is string => typeof id === "string" && IMAGE_ID.test(id)) : []);
         this.receive(msg.elements ?? [], "init");
         this.flush();
         this.scheduleHeartbeat();
@@ -299,6 +388,9 @@ export class BoardConnection {
 
   /** Gỡ handler trước khi đóng: socket cũ không còn đổi trạng thái hay dữ liệu dù phản hồi tới muộn. */
   private dropSocket(): void {
+    this.rejectUpload("Kết nối bảng đã ngắt. Hãy thử tải ảnh lại.");
+    this.imageSupport = false; this.events.onImages?.(false);
+    this.incomingFiles.clear(); this.waitingImages.clear(); this.serverFiles.clear();
     clearTimeout(this.handshakeTimer);
     clearTimeout(this.heartbeatTimer);
     clearTimeout(this.pongTimer);
@@ -312,7 +404,12 @@ export class BoardConnection {
   }
 
   private receive(remote: SyncElement[], kind: "init" | "update"): void {
-    this.scene.applyRemote(remote);
+    const ready: SyncElement[] = [];
+    for (const el of remote) {
+      if (el.type === "image" && !this.scene.files?.()[el.fileId!]) this.waitingImages.set(el.id, el);
+      else { this.waitingImages.delete(el.id); ready.push(el); }
+    }
+    this.scene.applyRemote(ready);
     for (const el of remote) this.sent.set(el.id, versionKey(el)); // máy chủ đã có, không gửi lại
     this.events.onActivity?.({ kind, elements: remote });
   }

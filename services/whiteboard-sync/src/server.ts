@@ -6,20 +6,24 @@ import { loadConfig, loadRootEnv, type Config } from "./config.ts";
 import { RoomHub, type Peer } from "./rooms.ts";
 import { isBoardElement } from "./scene.ts";
 import { errorCode, SceneStore } from "./store.ts";
+import { fileMessages, ImageUpload, type BoardFile } from "./images.ts";
 
 /**
  * Giao thức (JSON):
  *   client -> server: {type:"auth", token}  (bắt buộc là tin đầu tiên, trong 5 giây)
  *                     {type:"update", elements:[...]}   (chỉ giáo viên; của học sinh bị bỏ qua)
  *                     {type:"ping", n}  (sau khi xác thực; web gửi mỗi 5 giây để phát hiện đường truyền treo)
- *   server -> client: {type:"init", elements:[...], peers:n}
+ *                     {type:"file_chunk", uploadId,mimeType,offset,total,data} (chỉ giáo viên)
+ *   server -> client: {type:"init", elements:[...], peers:n, images:true, fileIds:[...]}
  *                     {type:"update", elements:[...], from:userId}
  *                     {type:"peers", count:n}
  *                     {type:"pong", n}  trả lời ping, chỉ có số thứ tự
+ *                     {type:"file_ack", uploadId,id,created} sau khi ghi tệp bền trên đĩa
+ *                     {type:"file_error", uploadId,message} hoặc {type:"file_data", id,mimeType,created,offset,total,data}
  *                     {type:"ended"} rồi đóng với mã 4410 khi giáo viên kết thúc buổi học
  *
  * HTTP (chỉ API gọi): POST /rooms/<id buổi học>/close, Authorization: Bearer <token {sid, act:"close"}>
- *                     -> 200 {elements:[...]} nội dung bảng cuối để API lưu vào Storage
+ *                     -> 200 {elements:[...]} hoặc {version:2,elements,files} khi có ảnh, để API lưu Storage
  *                     -> 400 id trên URL sai mã hóa; 401 token sai hoặc của buổi khác;
  *                        500 lỗi đĩa (đã ngắt và chặn phòng, gọi lại để lưu tiếp)
  *                     Gọi lại được, kể cả sau khi máy chủ khởi động lại.
@@ -70,9 +74,10 @@ export function createBoardServer(config: Config): BoardServer {
           if (tokenSid !== sid) return void res.writeHead(401).end(); // token của buổi học khác
           const peers = [...hub.peersOf(sid)];
           let elements;
+          let files: Record<string, BoardFile> = {};
           try {
             if (act === "purge") hub.purge(sid);
-            else elements = hub.end(sid);
+            else { files = hub.filesOf(sid); elements = hub.end(sid); }
           } catch (err) {
             console.error("Không lưu/xóa được bảng hoặc dấu đóng phòng", sid, errorCode(err));
             elements = null;
@@ -85,7 +90,7 @@ export function createBoardServer(config: Config): BoardServer {
           if (elements === null) return void res.writeHead(500).end();
           if (act === "purge") return void res.writeHead(204).end();
           res.writeHead(200, { "content-type": "application/json" });
-          res.end(JSON.stringify({ elements }));
+          res.end(JSON.stringify(Object.keys(files).length ? { version: 2, elements, files } : { elements }));
         },
         () => void res.writeHead(401).end(),
       );
@@ -107,6 +112,25 @@ export function createBoardServer(config: Config): BoardServer {
   wss.on("connection", (socket: WebSocket) => {
     let claims: BoardClaims | undefined;
     let peer: Peer | undefined;
+    // Mỗi file chỉ nằm trong hàng một lần; gửi từng mảnh nhường lượt cho heartbeat/nét.
+    const pendingFiles = new Map<string, Generator<ReturnType<typeof fileMessages> extends Generator<infer M> ? M : never>>();
+    let deliveryTimer: ReturnType<typeof setTimeout> | undefined;
+    const drain = () => {
+      deliveryTimer = undefined;
+      if (socket.readyState !== socket.OPEN || !pendingFiles.size) return;
+      if (socket.bufferedAmount < 512 * 1024) {
+        const [id, chunks] = pendingFiles.entries().next().value!;
+        const part = chunks.next();
+        if (part.done) pendingFiles.delete(id); else send(socket, part.value);
+      }
+      if (pendingFiles.size) deliveryTimer = setTimeout(drain, socket.bufferedAmount > 512 * 1024 ? 50 : 0);
+    };
+    const queueFile = (file: BoardFile) => {
+      if (!pendingFiles.has(file.id)) pendingFiles.set(file.id, fileMessages(file));
+      if (deliveryTimer === undefined) deliveryTimer = setTimeout(drain, 0);
+    };
+    // Socket nhận file từ broadcast mà không lộ thêm API HTTP.
+    const deliver = (other: Peer, file: BoardFile) => other.sendFile?.(file);
 
     const authTimer = setTimeout(() => {
       if (!claims) socket.close(4401, "auth timeout");
@@ -157,14 +181,15 @@ export function createBoardServer(config: Config): BoardServer {
         let room;
         try {
           if (hub.isEnded(claims.sid)) return socket.close(CLOSE_SESSION_ENDED, "session ended");
-          peer = { socket, claims };
+          peer = { socket, claims, sendFile: queueFile };
           room = hub.join(claims.sid, peer);
         } catch (err) {
           console.error("Không đọc được bảng đã lưu", claims.sid, errorCode(err));
           peer = undefined;
           return socket.close(1011, "storage error");
         }
-        send(socket, { type: "init", elements: room.scene.snapshot(), peers: room.peers.size });
+        send(socket, { type: "init", elements: room.scene.snapshot(), peers: room.peers.size, images: true, fileIds: Object.keys(room.files) });
+        for (const file of Object.values(room.files)) queueFile(file);
         for (const other of room.peers) {
           if (other !== peer) send(other.socket, { type: "peers", count: room.peers.size });
         }
@@ -177,6 +202,34 @@ export function createBoardServer(config: Config): BoardServer {
         return send(socket, { type: "pong", n: typeof m.n === "number" && Number.isFinite(m.n) ? m.n : undefined });
       }
 
+      if (m.type === "file_chunk") {
+        const input = msg as Record<string, unknown>;
+        const uploadId = typeof input.uploadId === "string" ? input.uploadId : "";
+        if (claims.role !== "teacher") return send(socket, { type: "file_error", uploadId, message: "Chỉ giáo viên được chèn ảnh." });
+        const room = peer && hub.roomOf(claims.sid, peer);
+        if (!room || !peer) return;
+        try {
+          if (room.upload && (room.uploadOwner !== peer || room.upload.uploadId !== uploadId)) throw new Error("Bảng đang tải ảnh khác. Hãy thử lại.");
+          if (!room.upload) {
+            room.upload = new ImageUpload(uploadId, String(input.mimeType), Number(input.total), () => room.stopUpload());
+            room.uploadOwner = peer;
+          }
+          if (room.upload.total !== input.total || room.upload.mimeType !== input.mimeType) throw new Error("Ảnh không hợp lệ hoặc vượt giới hạn cho phép.");
+          const completed = room.upload.add(input.offset, input.data);
+          if (!completed) return;
+          const file = hub.addFile(claims.sid, peer, completed);
+          room.stopUpload();
+          send(socket, { type: "file_ack", uploadId, id: file.id, created: file.created });
+          for (const other of room.peers) if (other !== peer) deliver(other, file);
+        } catch (err) {
+          if (room.uploadOwner === peer) room.stopUpload();
+          // Không phát thông điệp lỗi filesystem (có thể lộ đường dẫn) ra client.
+          const message = err instanceof Error && !((err as NodeJS.ErrnoException).code) ? err.message : "Chưa lưu được ảnh. Hãy thử lại.";
+          send(socket, { type: "file_error", uploadId, message });
+        }
+        return;
+      }
+
       if (m.type === "update") {
         // Học sinh chỉ xem bảng (quyết định 14): bỏ qua, không đóng kết nối
         if (claims.role !== "teacher") return;
@@ -186,6 +239,9 @@ export function createBoardServer(config: Config): BoardServer {
         const valid = m.elements.filter(isBoardElement);
         const room = peer && hub.roomOf(claims.sid, peer); // buổi đã đóng: bỏ qua nét đến muộn
         if (!room || !peer) return;
+        if (valid.some(el => el.type === "image" && (typeof el.fileId !== "string" || !room.files[el.fileId]))) {
+          return send(socket, { type: "update_error", message: "Ảnh chưa được lưu trên máy chủ bảng." });
+        }
         const accepted = room.scene.apply(valid);
         if (accepted.length === 0) return;
         hub.changed(claims.sid);
@@ -196,6 +252,7 @@ export function createBoardServer(config: Config): BoardServer {
     });
 
     socket.on("close", () => {
+      clearTimeout(deliveryTimer); pendingFiles.clear();
       clearTimeout(authTimer);
       clearInterval(heartbeat);
       if (claims && peer) {

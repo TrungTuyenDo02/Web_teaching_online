@@ -11,6 +11,7 @@ from app.config import Settings
 from app.core import time as clock
 from app.models import CLOSED_STATUSES, SessionRow, UploadIntent
 from app.repo import Repository
+from app.services.board_document import BoardSnapshot, validate_snapshot
 from app.services.tokens import (
     close_livekit_room,
     close_whiteboard_room,
@@ -38,7 +39,7 @@ async def _student_present(repo: Repository, student_id: str) -> bool:
     return student is not None and student.deleting_at is None
 
 
-async def _save_board(repo: Repository, session: SessionRow, elements: list[dict]) -> None:
+async def _save_board(repo: Repository, session: SessionRow, elements: BoardSnapshot) -> None:
     """Tải bản bảng cuối lên Storage mà không tạo lại dữ liệu của học sinh đang hoặc đã xóa.
 
     Bắt tay với student_deletion qua cơ sở dữ liệu (không cần khóa, đúng cả khi nhiều tiến trình):
@@ -48,6 +49,7 @@ async def _save_board(repo: Repository, session: SessionRow, elements: list[dict
     đã giữ (học sinh còn học) hay gỡ (học sinh đang/đã xóa) file. Lỗi, timeout hay chết giữa chừng
     thì hàng ở lại; sweep_stale_uploads canh và dọn file nếu học sinh đang/đã xóa.
     """
+    validate_snapshot(elements)
     intent = await repo.add_upload_intent(session.student_id, session.id)
     if not await _student_present(repo, session.student_id):
         await repo.delete_upload_intent(intent.id)  # đang xóa: không tải lên
@@ -103,7 +105,8 @@ async def finalize_session(repo: Repository, settings: Settings, session: Sessio
         logger.exception("Không đóng được phòng video của buổi học %s", session.id)
     try:
         elements = await close_whiteboard_room(settings, session.id)
-        if elements:  # bảng trống (hoặc máy chủ bảng mất dữ liệu): giữ bản đã lưu trước đó
+        has_elements = bool(elements if isinstance(elements, list) else elements.get("elements"))
+        if has_elements:  # bảng trống: giữ bản snapshot đã lưu trước đó
             await _save_board(repo, session, elements)
     except Exception:
         ok = False

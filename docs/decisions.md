@@ -201,3 +201,20 @@ Mỗi quyết định ghi lý do và điều gì khiến phải xem lại.
 - **Nghiệm thu:** API/RLS/UI kiểm cục bộ bằng dữ liệu giả, chưa gọi OpenAI thật. Bài giảng HS tắt riêng chờ E6/E7; bộ kiểm fail-closed không thay eval đối kháng. Chưa hoàn tất Teacher-Ops/Tutor. Cấu hình và giới hạn: [assistant.md](assistant.md).
 - **Xem lại nếu:** cần tìm kiếm ngữ nghĩa, nhập PDF/ảnh, nhiều tài liệu, transcript bền hoặc tool ghi nghiệp vụ; đo chất lượng/chi phí trước khi mở rộng.
 
+## 28. Ảnh đề bài đồng bộ và lưu cùng snapshot bảng (2026-10-22)
+
+- **Yêu cầu đã chốt:** giáo viên chọn ảnh từ máy lên bảng và giữ ảnh khi xem lại buổi học. Chủ dự án đã yêu cầu triển khai.
+- **Cách làm:** chuẩn hóa qua canvas ở web, chuyển theo mảnh trên socket bảng đã xác thực; máy chủ tính hash nội dung và ghi bền trước ACK. Ảnh nằm riêng cạnh scene, chỉ ID đi cùng phần tử/nét. Máy nhận nạp và kiểm hash tệp trước khi hiển thị. Hash phía web dùng SHA256 thuần TypeScript vì LAN HTTP không có `crypto.subtle`.
+- **Lưu/xóa:** snapshot version 2 chứa elements/files, reader vẫn nhận mảng cũ. Dùng cùng upload intent, bucket riêng tư và quyền xem lại hiện có; purge dọn cả thư mục ảnh. Không thêm migration, dịch vụ hoặc thư viện; không gửi ảnh AI.
+- **Giới hạn:** đầu vào 10 MiB, ảnh chuẩn hóa tối đa 2560 px/2 MiB; mỗi phòng 20 tệp/6 MiB, snapshot tối đa 20 MiB. Ảnh đã xóa khỏi scene vẫn giữ để hoàn tác và tính hạn mức. Chưa hỗ trợ PDF/ảnh động/URL. Nâng cấp đồng bộ ba thành phần web/API/bảng.
+- **Xem lại nếu:** cần nhiều trang đề lớn, kho ảnh dùng lại hoặc giải phóng dung lượng giữa buổi; khi đó đánh giá lưu blob riêng thay vì mở rộng snapshot tùy tiện. Cách dùng và phạm vi kiểm thử: [whiteboard-images.md](whiteboard-images.md).
+
+
+## 29. Giai đoạn 2: chữa bài trên ảnh, hồ sơ học sinh, yêu cầu làm lại (2026-10-22)
+
+- **Yêu cầu đã chốt:** chủ dự án cho làm GĐ2 song song với nghiệm thu GĐ1, chọn Excalidraw làm công cụ chữa bài và cần trạng thái "cần làm lại".
+- **Chữa trên ảnh:** Excalidraw toàn màn hình (cùng thư viện, cùng cách viết bút như bảng), ảnh gốc khóa làm nền, xuất JPEG thành tệp `submission_files.kind = 'annotated'` (cột có từ 0001) qua API, gỡ metadata như ảnh nộp. Không lưu scene để sửa lại; "Chữa tiếp" tạo ảnh mới từ ảnh chữa. Giáo viên xóa được ảnh chữa, không xóa được ảnh gốc. OCR chỉ gửi ảnh gốc.
+- **Cần làm lại:** không thêm trạng thái DB. Trả bài kèm `redo` giữ lượt nộp ở `returned` (học sinh đọc nhận xét, ảnh chữa) và đưa bài tập về `assigned`; web hiểu "assigned + đã có lượt nộp" là "Cần làm lại". Bắt buộc có nhận xét. Không migration, không policy mới.
+- **Hồ sơ học sinh:** trang chỉ đọc `/students/:id` gom dữ liệu đã có qua RLS; lọc theo học sinh phía trình duyệt (một giáo viên, ít học sinh).
+- **Giới hạn đã biết:** RLS 0001 cho học sinh đọc mọi `submission_files` của bài mình, nên ảnh chữa đọc được qua Supabase ngay khi lưu dù giao diện chỉ hiện khi đã trả. Chưa giới hạn số lần làm lại.
+- **Xem lại nếu:** cần giấu ảnh chữa tới lúc trả (policy theo `kind` + trạng thái), cần sửa lại nét đã lưu (lưu scene), hoặc báo cáo cần phân biệt "chưa nộp" với "cần làm lại" ở DB.

@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import type { TeachingRecord, TeachingTopic } from "../lib/api";
@@ -146,7 +147,8 @@ function NotesForMonth({ studentId, studentName, month }: { studentId: string; s
 
 function TeacherNotes() {
   const students = useAsync(async () => (await backend.listStudents()).filter((s) => !s.deleting_at), "Không tải được học sinh.");
-  const [studentId, setStudentId] = useState("");
+  const [params] = useSearchParams(); // ?student=<id>: mở từ trang hồ sơ học sinh
+  const [studentId, setStudentId] = useState(params.get("student") ?? "");
   const [month, setMonth] = useState(currentMonth);
   const student = students.data?.find((s) => s.id === studentId);
   return (

@@ -51,3 +51,75 @@ test("HW-02 học sinh chỉ thấy bài của mình, nộp ảnh có thông bá
   await expect(row).toContainText("Đã nộp");
   await expect(row).toContainText("Đã nộp 2 ảnh");
 });
+
+test("HW-03 giáo viên chữa trên ảnh bằng bút: lưu thành ảnh chữa riêng, xóa được ảnh chữa, ảnh gốc giữ nguyên", async ({ page, openPreview }) => {
+  await openPreview(page, "teacher", "/assignments");
+  await page.getByRole("listitem").filter({ hasText: "Phiếu luyện phương trình" }).getByRole("button", { name: "Xem và chấm" }).click();
+  const review = page.getByRole("dialog", { name: /Bài nộp · Phiếu luyện phương trình/ });
+  await review.getByRole("button", { name: "Chữa trên ảnh: Ảnh bài làm 1" }).click();
+
+  const annotator = page.getByRole("dialog", { name: "Chữa bài · Phiếu luyện phương trình" });
+  const save = annotator.getByRole("button", { name: "Lưu ảnh chữa" });
+  await expect(save).toBeEnabled(); // ảnh bài làm đã nạp làm nền
+  const box = await annotator.locator(".excalidraw__canvas.interactive").boundingBox();
+  if (!box) throw new Error("Không thấy canvas chữa bài");
+  // Công cụ bút đã chọn sẵn: kéo một nét qua giữa ảnh
+  await page.mouse.move(box.x + box.width / 2 - 60, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 30, { steps: 10 });
+  await page.mouse.up();
+  await save.click();
+  await expect(page.getByRole("status").filter({ hasText: "Đã lưu ảnh chữa." })).toBeVisible();
+  await expect(annotator).toHaveCount(0);
+
+  const marked = review.getByRole("img", { name: "Ảnh thầy cô chữa 1" });
+  await expect.poll(() => marked.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  // Nét bút đỏ nằm trong ảnh đã lưu (ảnh mẫu không có màu đỏ)
+  const hasInk = await marked.evaluate((img: HTMLImageElement) => {
+    const canvas = Object.assign(document.createElement("canvas"), { width: img.naturalWidth, height: img.naturalHeight });
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 0; i < px.length; i += 4) if (px[i] > 180 && px[i + 1] < 90 && px[i + 2] < 90) return true;
+    return false;
+  });
+  expect(hasInk).toBe(true);
+  await expect(review.getByRole("img", { name: "Ảnh bài làm 1" })).toBeVisible();
+  await expect(review.getByRole("img", { name: "Ảnh bài làm 2" })).toHaveCount(0); // ảnh chữa không lẫn vào ảnh gốc
+
+  await review.getByRole("button", { name: "Xóa ảnh chữa: Ảnh thầy cô chữa 1" }).click();
+  await page.getByRole("dialog", { name: "Xóa ảnh chữa?" }).getByRole("button", { name: "Xóa ảnh chữa" }).click();
+  await expect(marked).toHaveCount(0);
+  await expect(review.getByRole("img", { name: "Ảnh bài làm 1" })).toBeVisible();
+});
+
+test("HW-04 giáo viên yêu cầu làm lại (bắt buộc nhận xét): bài hiện Cần làm lại, không đóng bài", async ({ page, openPreview }) => {
+  await openPreview(page, "teacher", "/assignments");
+  const row = page.getByRole("listitem").filter({ hasText: "Phiếu luyện phương trình" });
+  await row.getByRole("button", { name: "Xem và chấm" }).click();
+  const review = page.getByRole("dialog", { name: /Bài nộp · Phiếu luyện phương trình/ });
+  await review.getByRole("button", { name: "Yêu cầu làm lại" }).click();
+  await expect(review.getByRole("alert")).toContainText("Hãy viết nhận xét");
+  await review.getByLabel("Nhận xét cho học sinh").fill("Câu 3 thiếu bước thử lại nghiệm.");
+  await review.getByRole("button", { name: "Yêu cầu làm lại" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Đã gửi yêu cầu làm lại cho Nguyễn Lan Anh." })).toBeVisible();
+  await expect(row).toContainText("Cần làm lại");
+  await expect(row.getByRole("button", { name: "Xem lại bài nộp" })).toBeVisible();
+});
+
+test("HW-05 học sinh thấy yêu cầu làm lại, nhận xét và ảnh thầy cô chữa, rồi nộp lại được", async ({ page, openPreview }) => {
+  await openPreview(page, "student");
+  const row = page.getByRole("region", { name: "Bài tập" }).getByRole("listitem").filter({ hasText: "Bài 6 trang 20" });
+  await expect(row).toContainText("Cần làm lại");
+  await expect(row).toContainText("Thầy cô yêu cầu em làm lại");
+  await expect(row).toContainText("Câu b sai dấu");
+  await expect(row.getByRole("img", { name: "Ảnh thầy cô chữa 1" })).toBeVisible();
+  await expect(row).toContainText("Đã nộp 1 ảnh"); // ảnh chữa không tính vào ảnh em nộp
+  await row.getByRole("button", { name: "Nộp lại" }).click();
+  const dialog = page.getByRole("dialog", { name: /Nộp bài · Bài 6 trang 20/ });
+  await dialog.getByLabel("Ảnh bài làm").setInputFiles([{ name: "lam-lai.png", mimeType: "image/png", buffer: PNG }]);
+  await dialog.getByRole("button", { name: "Nộp bài" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Đã nộp bài." })).toBeVisible();
+  await expect(row).toContainText("Đã nộp");
+  await expect(row).not.toContainText("Cần làm lại");
+});
