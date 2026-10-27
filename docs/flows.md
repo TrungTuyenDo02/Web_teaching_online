@@ -184,6 +184,7 @@ sequenceDiagram
   Note over API,WB: Mỗi bước chạy độc lập, lỗi bước này không chặn bước khác; API không cấp token mới cho buổi đã xong
   Note over API,DB: completed mà finalized_at rỗng: vòng lặp nền của API thử lại cả chuỗi (kể cả sau khi API khởi động lại)
   Note over API,LK: Vòng lặp nền dọn phòng của buổi đã đóng kể cả finalized_at đã ghi; phòng không còn buổi chỉ xóa khi nhãn sở hữu có chữ ký khớp môi trường/tên phòng. DB lỗi hoặc phòng lạ thì giữ lại
+  Note over API,LK: Vòng lặp nền riêng mỗi 2 phút thu hồi lại token GV/HS của buổi đã đóng tới hết hạn token (scheduled_end + vào muộn + TTL + 10 phút), vì Cloud chỉ giữ thu hồi 6–12 phút
   Note over API,WB: Đóng bảng gọi lại được và trả lại bản cuối; lỗi đĩa trả 500 (vẫn ngắt, chặn), không báo đã lưu
 ```
 
@@ -489,8 +490,10 @@ Không có tool ghi: tạo/sửa/hủy buổi, lịch, tài khoản vẫn qua bi
 
 ```mermaid
 flowchart TD
-  A[GV giao bài: POST /api/assignments] --> B[HS chọn ảnh, web vẽ lại qua canvas: xoay đúng, ≤ 2000 px, JPEG]
+  A[GV giao bài: POST /api/assignments] --> B[HS Chụp ảnh hoặc Chọn ảnh, dồn thêm ≤ 6, xem trước, bỏ ảnh hỏng; web vẽ lại qua canvas: xoay đúng, ≤ 2000 px, JPEG]
   B --> C[POST /api/assignments/:id/submissions ảnh đầu, /api/submissions/:id/files ảnh sau]
+  C -->|Lỗi giữa chừng| C2[Ảnh đã gửi giữ nguyên; Gửi tiếp gửi phần còn lại vào cùng bài nộp]
+  C2 --> C
   C --> D{API: đúng HS, chưa trả bài, JPEG/PNG/WebP, ≤ giới hạn}
   D -->|Không| X[404 / 409 / 413 / 422]
   D -->|Có| E[Gỡ EXIF/GPS, lưu submissions/HS/bài/…; HS bị xóa giữa chừng thì xóa ảnh vừa lưu]
@@ -521,7 +524,13 @@ flowchart TD
   F --> R[GV Yêu cầu làm lại, bắt buộc nhận xét: lượt nộp returned, bài tập về assigned]
   R --> S[HS thấy Cần làm lại + nhận xét + ảnh chữa → Nộp lại: lượt nộp mới, bài tập submitted]
   S --> A
+  H --> N{Còn bài khác ở mục Chờ chấm?}
+  R --> N
+  N -->|Có| A2[Tự mở bài chờ chấm kế tiếp]
+  N -->|Không| Z2[Đóng hộp thoại]
 ```
+
+Chấm theo hàng chờ (chỉ giao diện, không đổi API): trang Bài tập mặc định mở mục **Chờ chấm** (bài tập `submitted`) khi có bài chờ; nhận xét có sẵn gồm tối đa 6 nhận xét đã dùng (≤ 200 ký tự, lấy từ danh sách đã tải) + 4 câu mẫu; chọn nhanh điểm 10–5; nhận xét/điểm đang viết giữ trong bộ nhớ trang theo bài nộp khi đóng hộp thoại, mất khi tải lại trang.
 
 Ảnh gốc của học sinh không bị sửa hay xóa qua đường này (API trả 409); OCR chỉ gửi ảnh gốc. Xóa hẳn học sinh dọn cả ảnh chữa vì cùng thư mục `submissions/<student_id>/`. RLS 0001 cho học sinh đọc mọi `submission_files` của bài mình, nên ảnh chữa đọc được qua Supabase ngay khi lưu; giao diện chỉ hiện khi bài đã trả.
 

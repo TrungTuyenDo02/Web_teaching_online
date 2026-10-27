@@ -169,6 +169,12 @@ code { font-family: var(--font-mono); background: var(--lavender-100); padding: 
 .work-images li { display: grid; gap: var(--sp-1); align-content: start; }
 .work-images a { display: block; min-height: var(--touch); border: var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-window); }
 .work-images img { display: block; width: 100%; height: 200px; object-fit: contain; } /* thấy trọn trang, không cắt mép */
+.work-images--picked { grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr)); }
+.work-images--picked img { height: 140px; border: var(--border); border-radius: var(--radius-sm); background: var(--bg-window); }
+/* Nhận xét có sẵn: một hàng cuộn ngang để nút Trả bài không bị đẩy xa; câu dài cắt bớt (đủ câu ở title) */
+.comment-bank { display: flex; gap: var(--sp-1); overflow-x: auto; padding-bottom: var(--sp-1); overscroll-behavior-x: contain; }
+.comment-bank .btn { flex: none; max-width: min(18rem, 80%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assignments-filter { justify-self: start; align-self: flex-start; }
 .ocr-text { padding: var(--sp-3); background: var(--cream-100); border: var(--border-w) dashed var(--peach-500); border-radius: var(--radius-md); font-family: var(--font-mono); font-size: var(--text-sm); max-height: 320px; overflow: auto; }
 .form fieldset { min-width: 0; border: 1px solid var(--ink-700); padding: var(--sp-3); }
 .field { display: grid; gap: var(--sp-1); min-width: 0; align-content: start; } /* không giãn hàng: ô nhập hai cột thẳng hàng */
@@ -278,7 +284,7 @@ textarea.input { min-height: 88px; resize: vertical; }
 /* Bộ lọc dạng nút bật/tắt */
 .segmented { display: inline-flex; flex-wrap: wrap; border: var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-window); }
 .segmented button {
-  min-height: var(--touch); padding: 0 var(--sp-4); font: inherit; font-weight: var(--fw-bold); color: var(--ink-900);
+  min-height: var(--touch); min-width: var(--touch); padding: 0 var(--sp-4); font: inherit; font-weight: var(--fw-bold); color: var(--ink-900);
   background: transparent; border: 0; border-right: var(--border); cursor: pointer;
 }
 .segmented button:last-child { border-right: 0; }
@@ -311,8 +317,7 @@ textarea.input { min-height: 88px; resize: vertical; }
 /* Màn hình hẹp: video là dải phụ dưới bảng */
 .room__video { min-height: 0; height: 200px; border: var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--ink-900); }
 .room__video :focus-visible { outline-color: var(--bg-window); } /* nền tối: viền focus sáng */
-@media (min-width: 1024px) { .room--main .room__video { height: auto; } .room--main .video-tiles { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
-.room--board { padding: var(--sp-1); gap: var(--sp-1); }
+@media (min-width: 1024px) { .room--main .room__video { height: auto; } .room--main .video-tiles { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }.room--board { padding: var(--sp-1); gap: var(--sp-1); }
 .room--board .room__body { grid-template-rows: minmax(0, 1fr); }
 .room__video { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-1); }
 /* Hai ô video: dải dưới bảng thì nằm ngang, cột bên phải thì xếp dọc */
@@ -320,7 +325,8 @@ textarea.input { min-height: 88px; resize: vertical; }
 .video-tile { position: relative; margin: 0; min-height: 0; border-radius: var(--radius-sm); overflow: hidden; background: var(--lavender-100); display: grid; place-items: center; }
 .video-tile video { width: 100%; height: 100%; object-fit: cover; }
 .video-tile--self video { transform: scaleX(-1); } /* ô của mình như soi gương */
-.video-tile__chibi { max-width: 70%; max-height: 70%; object-fit: contain; }
+/* Định vị tuyệt đối theo ô: % chiều cao không phụ thuộc cỡ ảnh gốc (tablet dọc từng bị cắt nửa dưới) */
+.video-tile__chibi { position: absolute; inset: 0; margin: auto; width: 70%; height: 70%; object-fit: contain; }
 .video-tile figcaption {
   position: absolute; left: var(--sp-1); bottom: var(--sp-1); max-width: calc(100% - 2 * var(--sp-1));
   padding: 2px var(--sp-1); border-radius: var(--radius-sm); background: var(--ink-900); color: var(--bg-window);
@@ -329,6 +335,9 @@ textarea.input { min-height: 88px; resize: vertical; }
 .video-controls { flex: none; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--sp-1); }
 .video-controls .lk-button { min-height: var(--touch); }
 .video-mic-level { width: 6rem; height: 1rem; }
+/* Dải video dưới bảng (màn hẹp) chỉ cao 200px: nhường chỗ cho hình, mẹo có trong bot Hướng dẫn */
+.video-tip { flex: none; margin: 0; color: var(--bg-window); font-size: var(--text-xs); text-align: center; }
+@media (max-width: 1023px) { .video-tip { display: none; } }
 .video-tile__net--poor { color: var(--warning-100); }
 .video-tile__net--lost { color: var(--danger-100); }
 
@@ -427,7 +436,8 @@ textarea.input { min-height: 88px; resize: vertical; }
   /* Thanh phòng một hàng: tên phòng tự rút gọn, chừa chiều cao cho bảng */
   .room__bar { flex-wrap: nowrap; }
   .room__bar .btn { padding-inline: var(--sp-2); flex: none; }
-  .room__video { height: clamp(140px, 24dvh, 200px); }
+  /* Học sinh trên điện thoại cần chỗ cho bảng nhất: dải video thấp (hai ô vẫn thấy mặt) */
+  .room__video { height: clamp(140px, 18dvh, 160px); }
 }
 /* Điện thoại xoay ngang (thấp): bảng bên trái, video thành cột phụ bên phải thay vì dải dưới che bảng */
 @media (max-height: 540px) and (orientation: landscape) and (max-width: 1023px) {

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { backend, errorMessage, type AssignmentItem } from "../../lib/data";
 import { useAsync, useNow } from "../../lib/hooks";
 import { t } from "../../lib/i18n";
@@ -15,51 +15,95 @@ const MAX_FILES = 6;
 
 function SubmitDialog({ item, onClose, onDone, onPartial }: { item: AssignmentItem; onClose: () => void; onDone: () => void; onPartial: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
+  // Ảnh đã lên máy chủ trong lần nộp này: lỗi giữa chừng thì gửi tiếp từ ảnh sau, không tạo bài nộp mới
+  const [sent, setSent] = useState(0);
+  const submissionId = useRef<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pick = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
+  const previews = useMemo(() => files.map((file) => URL.createObjectURL(file)), [files]);
+  useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
+  const busy = progress !== null;
+
+  function add(event: ChangeEvent<HTMLInputElement>) {
+    const picked = [...(event.target.files ?? [])];
+    event.target.value = ""; // chọn lại đúng ảnh vừa bỏ vẫn nhận
+    setError(files.length + picked.length > MAX_FILES ? t("Mỗi lần nộp tối đa {n} ảnh.", { n: MAX_FILES }) : null);
+    setFiles((old) => [...old, ...picked].slice(0, MAX_FILES));
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!files.length) return setError(t("Hãy chọn ít nhất một ảnh bài làm."));
-    if (files.length > MAX_FILES) return setError(t("Mỗi lần nộp tối đa {n} ảnh.", { n: MAX_FILES }));
     setError(null);
-    let submissionId: string | null = null;
+    let done = sent;
+    if (done >= files.length) return onDone(); // đã gửi hết, chỉ bỏ các ảnh lỗi còn lại
+    // Thu nhỏ ảnh kế tiếp trong lúc ảnh này đang gửi
+    let next = prepareImage(files[done]!);
     try {
-      for (const [i, file] of files.entries()) {
-        setProgress(t("Đang gửi ảnh {i}/{n}…", { i: i + 1, n: files.length }));
-        const image = await prepareImage(file);
-        if (submissionId) await backend.addSubmissionImage(submissionId, image);
-        else submissionId = (await backend.submitAssignment(item.id, image)).id;
+      for (; done < files.length; done++) {
+        setProgress(t("Đang gửi ảnh {i}/{n}…", { i: done + 1, n: files.length }));
+        const image = await next;
+        if (done + 1 < files.length) {
+          next = prepareImage(files[done + 1]!);
+          next.catch(() => undefined); // lỗi được báo khi tới lượt ảnh đó
+        }
+        if (submissionId.current) await backend.addSubmissionImage(submissionId.current, image);
+        else submissionId.current = (await backend.submitAssignment(item.id, image)).id;
+        setSent(done + 1);
       }
       onDone();
     } catch (err) {
-      // Ảnh đã gửi trước khi lỗi vẫn được lưu: báo rõ để em không nộp trùng
+      const reason = errorMessage(err, "Không gửi được ảnh.");
       setError(
-        submissionId
-          ? t("Đã gửi một phần. {reason} Hãy báo thầy cô nếu thiếu ảnh.", { reason: errorMessage(err, "Không gửi được ảnh.") })
+        submissionId.current
+          ? t("Đã gửi {sent}/{n} ảnh. {reason} Bấm Gửi tiếp để gửi các ảnh còn lại.", { sent: done, n: files.length, reason })
           : errorMessage(err, "Không nộp được bài."),
       );
-      if (submissionId) onPartial(); // tải lại danh sách, giữ hộp thoại để em đọc lỗi
+      if (submissionId.current) onPartial(); // tải lại danh sách, giữ hộp thoại để gửi tiếp
     } finally {
       setProgress(null);
     }
   }
 
   return (
-    <Dialog open title={t("Nộp bài · {title}", { title: item.title })} file="upload.jpg" variant="peach" onClose={onClose} busy={progress !== null}>
+    <Dialog open title={t("Nộp bài · {title}", { title: item.title })} file="upload.jpg" variant="peach" onClose={onClose} busy={busy}>
       <form className="form" onSubmit={(e) => void onSubmit(e)}>
         {item.description && <p className="prose-text">{item.description}</p>}
         <Field label={t("Ảnh bài làm")} required hint={t("Chụp rõ từng trang, tối đa {n} ảnh (JPEG, PNG, WebP).", { n: MAX_FILES })}>
-          {(c) => <input {...c} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => setFiles([...(e.target.files ?? [])])} />}
+          {(c) => <input {...c} ref={pick} className="sr-only" tabIndex={-1} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={add} />}
         </Field>
+        <input ref={camera} className="sr-only" tabIndex={-1} aria-hidden="true" type="file" accept="image/*" capture="environment" onChange={add} />
+        <div className="btn-row">
+          <Button onClick={() => camera.current?.click()} disabled={busy || files.length >= MAX_FILES}>{t("Chụp ảnh")}</Button>
+          <Button onClick={() => pick.current?.click()} disabled={busy || files.length >= MAX_FILES}>{t("Chọn ảnh có sẵn")}</Button>
+        </div>
+        {files.length > 0 && (
+          <ul className="work-images work-images--picked" aria-label={t("Ảnh sẽ nộp")}>
+            {files.map((file, i) => (
+              <li key={previews[i]}>
+                <img src={previews[i]} alt={t("Ảnh bài làm {n}", { n: i + 1 })} />
+                {i < sent ? (
+                  <span className="muted">{t("Đã gửi")}</span>
+                ) : (
+                  <Button size="sm" disabled={busy} aria-label={t("Bỏ ảnh {n}", { n: i + 1 })}
+                    onClick={() => setFiles((old) => old.filter((f) => f !== file))}>
+                    {t("Bỏ ảnh")}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
         <Alert tone="info">
           {t("Ảnh chỉ thầy cô và em xem được. Vị trí chụp và thông tin máy ảnh được gỡ trước khi lưu. Thầy cô có thể nhờ AI (Google Gemini) đọc chữ trong ảnh để chấm nhanh hơn.")}
         </Alert>
         <p className="sr-only" role="status">{progress ?? ""}</p>
         {error && <Alert tone="error">{error}</Alert>}
         <div className="btn-row btn-row--end">
-          <Button onClick={onClose} disabled={progress !== null}>{t("Thôi")}</Button>
-          <Button type="submit" variant="primary" busy={progress !== null} busyLabel={progress ?? undefined}>{t("Nộp bài")}</Button>
+          <Button onClick={onClose} disabled={busy}>{sent ? t("Đóng") : t("Thôi")}</Button>
+          <Button type="submit" variant="primary" busy={busy} busyLabel={progress ?? undefined}>{sent ? t("Gửi tiếp") : t("Nộp bài")}</Button>
         </div>
       </form>
     </Dialog>

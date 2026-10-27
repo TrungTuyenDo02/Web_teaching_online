@@ -10,6 +10,7 @@ const VIEWPORTS = [
   { name: "tablet dọc", width: 768, height: 1024 },
   { name: "tablet ngang", width: 1024, height: 768 },
   { name: "laptop", width: 1280, height: 800 },
+  { name: "điện thoại ngang", width: 740, height: 360 },
 ];
 
 const PAGES: { role: "teacher" | "student"; path: string; ready: string }[] = [
@@ -21,7 +22,11 @@ const PAGES: { role: "teacher" | "student"; path: string; ready: string }[] = [
   { role: "teacher", path: "/assignments", ready: "Bài đã giao" },
   { role: "teacher", path: "/room/u1?mode=main", ready: "Phòng học" },
   { role: "teacher", path: "/room/u1?mode=board", ready: "Bảng viết (tablet)" },
+  { role: "teacher", path: "/students/s1", ready: "profile.txt" },
+  { role: "teacher", path: "/assistant-materials", ready: "Kho bài giảng" },
   { role: "student", path: "/", ready: "Chào Nguyễn Lan Anh" },
+  { role: "student", path: "/history", ready: "Lịch sử buổi học" },
+  { role: "student", path: "/room/u1?mode=main", ready: "em xem bảng của thầy cô" },
 ];
 
 /** Phần tử bấm được của ứng dụng nhỏ hơn 44 px (bỏ qua Excalidraw, LiveKit, dải xem trước chỉ có ở dev, liên kết trong câu). */
@@ -147,4 +152,16 @@ test("UI-02 thao tác ẩn trong 'Thao tác khác' mở được bằng bàn ph�
   await page.keyboard.press("Enter");
   await expect(row.getByRole("button", { name: "Ngừng dạy" })).toBeVisible();
   await expect(page.getByLabel("Tìm theo tên hoặc lớp")).toHaveAttribute("type", "search");
+});
+
+test("UI-03 phòng học trên điện thoại: bảng chiếm phần lớn màn hình, xoay ngang thì video thành cột bên phải", async ({ page, openPreview }) => {
+  const box = async (selector: string) => (await page.locator(selector).first().boundingBox())!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openPreview(page, "student", "/room/u1?mode=main");
+  await expect(page.getByText("em xem bảng của thầy cô")).toBeVisible();
+  const [board, video] = [await box(".board"), await box(".room__video")];
+  expect(board.height).toBeGreaterThan(video.height * 2.5); // dải video thấp, nhường chỗ cho bảng
+  await page.setViewportSize({ width: 740, height: 360 });
+  await expect.poll(async () => (await box(".room__video")).x).toBeGreaterThan((await box(".board")).x + 100);
+  expect((await box(".board")).height).toBeGreaterThan(200);
 });

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import mascot from "../assets/helper-mascot.png";
 import { useAuth } from "../auth/AuthProvider";
 import type { Role } from "../lib/api";
@@ -15,6 +15,7 @@ import "./HelperBot.css";
 interface Exchange { question: string; answer: GuideReply }
 
 function Guide({ role }: { role: Role }) {
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
@@ -24,6 +25,8 @@ function Guide({ role }: { role: Role }) {
   const [ready, setReady] = useState<boolean | null>(null);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Câu đang chờ AI: hiện ngay trong khung chat thay vì nằm im trong ô nhập
+  const [asking, setAsking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef<AbortController | null>(null);
   const sending = useRef(false);
@@ -34,30 +37,29 @@ function Guide({ role }: { role: Role }) {
   const titleId = useId();
 
   useEffect(() => () => pending.current?.abort(), []);
+  // Hỏi một lần khi mở lần đầu; đổi chế độ thì hỏi đồng ý lại vì dữ liệu gửi đi khác nhau
+  useEffect(() => {
+    if (open && ready === null) backend.assistantStatus().then((s) => setReady(s.enabled), () => setReady(false));
+  }, [open, ready]);
 
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
   useEffect(() => {
-    if (open) last.current?.scrollIntoView({ block: "nearest" });
-  }, [open, exchanges]);
+    // Cuộn tới đầu lượt mới nhất: câu trả lời dài vẫn đọc được từ đầu
+    if (open) last.current?.scrollIntoView({ block: "start" });
+  }, [open, exchanges, asking]);
 
   function close() {
     setOpen(false);
     requestAnimationFrame(() => launcher.current?.focus());
-  }
-  async function chooseAI(next: "ai" | "ops") {
-    // Đổi chế độ thì hỏi đồng ý lại: dữ liệu gửi đi của hai chế độ khác nhau
-    setMode(next); setConsent(false); setError(null); setReady(null); setExchanges([]);
-    try { setReady((await backend.assistantStatus()).enabled); }
-    catch (err) { setReady(false); setError(errorMessage(err, "Không kiểm tra được trợ lý AI.")); }
   }
   async function send(question: string) {
     const value = question.trim().slice(0, 500);
     if (!value || sending.current) return;
     if (aiMode) {
       if (!consent || !ready) return;
-      sending.current = true; setBusy(true); setError(null);
+      sending.current = true; setBusy(true); setError(null); setAsking(value); setDraft("");
       const controller = new AbortController(); pending.current = controller;
       try {
         const ask = mode === "ops" ? backend.askTeacherOps : backend.askAssistant;
@@ -65,10 +67,12 @@ function Guide({ role }: { role: Role }) {
           history: exchanges.slice(-3).map((e) => ({ question: e.question, answer: e.answer.text.slice(0, 3000) })) }, controller.signal);
         if (!controller.signal.aborted) {
           setExchanges((old) => [...old.slice(-19), { question: value, answer: { text: reply.answer, links: reply.sources.map((s, i) => ({ to: s.path, label: `[${i + 1}] ${s.title}` })) } }]);
-          setDraft("");
         }
-      } catch (err) { if (!controller.signal.aborted) setError(errorMessage(err, "Trợ lý AI chưa trả lời được. Hãy thử lại sau.")); }
-      finally { sending.current = false; setBusy(false); pending.current = null; input.current?.focus(); }
+      } catch (err) {
+        // Trả câu hỏi về ô nhập để bấm Gửi lại, không phải gõ lại
+        if (!controller.signal.aborted) { setError(errorMessage(err, "Trợ lý AI chưa trả lời được. Hãy thử lại sau.")); setDraft(value); }
+      }
+      finally { sending.current = false; setBusy(false); setAsking(null); pending.current = null; input.current?.focus(); }
       return;
     }
     setExchanges((old) => [...old.slice(-19), { question: value, answer: answerGuide(value, role) }]);
@@ -94,18 +98,18 @@ function Guide({ role }: { role: Role }) {
                 <p className="muted">{mode === "ops" ? t("OpenAI · Lịch, học sinh, số buổi (chỉ xem)") : aiMode ? t("OpenAI · Tra cứu có nguồn") : t("Hướng dẫn dùng ứng dụng")}</p>
               </div>
             </div>
-            <Segmented className="helper__modes" label={t("Chế độ trợ giúp")} value={mode} disabled={busy}
-              onChange={(next) => { if (next === "guide") { setMode("guide"); setError(null); setExchanges([]); } else void chooseAI(next); }}
+            {/* Chưa bật AI thì không bày chế độ AI ra rồi mới báo "chưa bật" */}
+            {ready && <Segmented className="helper__modes" label={t("Chế độ trợ giúp")} value={mode} disabled={busy}
+              onChange={(next) => { setMode(next); setConsent(false); setError(null); setExchanges([]); }}
               options={[
                 { value: "guide" as const, label: t("Hướng dẫn") },
                 { value: "ai" as const, label: t("Hỏi AI") },
                 ...(role === "teacher" ? [{ value: "ops" as const, label: t("Lịch & lớp") }] : []),
-              ]} />
+              ]} />}
+            {role === "teacher" && ready === false && <p className="helper__notice muted">{t("Hỏi AI chưa bật; cách bật ở docs/assistant.md.")}</p>}
             {aiMode && <div className="helper__notice">
-              {ready === null && <p role="status">{t("Đang kiểm tra trợ lý AI…")}</p>}
-              {ready === false && !error && <p role="status">{t("Trợ lý AI chưa được bật hoặc cấu hình.")}</p>}
-              {ready && <Check checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={busy}>
-                {mode === "ops" ? t("Đồng ý gửi câu hỏi tới OpenAI để tra lịch, học sinh và số buổi. Tên học sinh được thay bằng mã trước khi gửi. Không nhập thông tin riêng tư, mật khẩu hay token.") : t("Đồng ý gửi câu hỏi và trích đoạn tài liệu liên quan tới OpenAI. Không nhập thông tin riêng tư, mật khẩu hay token.")}</Check>}
+              <Check checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={busy}>
+                {mode === "ops" ? t("Đồng ý gửi câu hỏi tới OpenAI để tra lịch, học sinh và số buổi. Tên học sinh được thay bằng mã trước khi gửi. Không nhập thông tin riêng tư, mật khẩu hay token.") : t("Đồng ý gửi câu hỏi và trích đoạn tài liệu liên quan tới OpenAI. Không nhập thông tin riêng tư, mật khẩu hay token.")}</Check>
               {role === "teacher" && mode === "ai" && <Link to="/assistant-materials" onClick={close}>{t("Quản lý bài giảng RAG")}</Link>}
               {role === "student" && <p className="muted">{t("Bài giảng chỉ được tra cứu sau khi thầy cô bật và đúng chủ đề em đã học.")}</p>}
             </div>}
@@ -114,7 +118,7 @@ function Guide({ role }: { role: Role }) {
                 ? t("Chào thầy cô! Mình giúp tìm đúng chỗ để quản lý lớp, xem báo cáo và ghi chú sau buổi học.")
                 : t("Chào em! Mình giúp em xem lịch, vào lớp và tìm lại bảng của buổi đã học.")}</p>
               {exchanges.map((item, index) => (
-                <div key={index} className="helper__exchange">
+                <div key={index} className="helper__exchange" ref={index === exchanges.length - 1 && !asking ? last : undefined}>
                   <p className="helper__bubble helper__bubble--user"><span className="sr-only">{t("Bạn:")} </span>{item.question}</p>
                   <div className="helper__bubble">
                     <p>{item.answer.text}</p>
@@ -122,10 +126,15 @@ function Guide({ role }: { role: Role }) {
                   </div>
                 </div>
               ))}
-              <div ref={last} />
+              {asking && (
+                <div className="helper__exchange" ref={last}>
+                  <p className="helper__bubble helper__bubble--user"><span className="sr-only">{t("Bạn:")} </span>{asking}</p>
+                  <p className="helper__bubble helper__typing">{t("Mình đang tìm câu trả lời…")}</p>
+                </div>
+              )}
             </div>
             <div className="helper__suggestions" aria-label={t("Câu hỏi gợi ý")}>
-              {(mode === "ops" ? opsSuggestions() : guideSuggestions(role)).map((question) => <Button key={question} size="sm" disabled={busy || (aiMode && (!ready || !consent))} onClick={() => void send(question)}>{question}</Button>)}
+              {(mode === "ops" ? opsSuggestions() : guideSuggestions(role, pathname)).map((question) => <Button key={question} size="sm" disabled={busy || (aiMode && (!ready || !consent))} onClick={() => void send(question)}>{question}</Button>)}
             </div>
             {error && <p className="helper__notice" role="alert">{error}</p>}
             <form className="helper__form" onSubmit={submit}>

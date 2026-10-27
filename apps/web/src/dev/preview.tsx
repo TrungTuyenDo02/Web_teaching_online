@@ -53,7 +53,7 @@ function seed() {
     { ...past("h2", "s2", 3, "Hàm số bậc nhất", "Vẽ đồ thị y = ax + b", "Vẽ 3 đồ thị trong phiếu", true), student_id: "s2" },
     { ...past("h3", "s1", 9, "Nhân đa thức", "Nhân đơn thức với đa thức", null, false), student_id: "s1" },
   ];
-  // Bài tập: một bài chưa nộp, một bài đã nộp (ảnh mẫu), một bài đã trả, một bài cần làm lại (có ảnh chữa)
+  // Bài tập: một bài chưa nộp, hai bài đã nộp (ảnh mẫu), một bài đã trả, một bài cần làm lại (có ảnh chữa)
   const assignment = (id: string, studentId: string, title: string, description: string, status: AssignmentItem["status"], daysAgo: number): AssignmentItem => ({
     id, student_id: studentId, student_name: name(studentId), title, description, due_at: at(60 * 24 * 3), status,
     created_at: at(-60 * 24 * daysAgo), submissions: [],
@@ -63,6 +63,10 @@ function seed() {
     { ...assignment("a2", "s1", "Phiếu luyện phương trình", "Giải và thử lại nghiệm", "submitted", 4),
       submissions: [{ id: "sub-a2", student_id: "s1", assignment_id: "a2", status: "submitted", submitted_at: at(-60 * 20), teacher_comment: null, score: null, returned_at: null,
         files: [{ id: "f-a2", submission_id: "sub-a2", storage_path: "sample:bai-lam", kind: "original" as const, mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
+    // Bài chờ chấm thứ hai: trả bài đầu thì bài này tự mở
+    { ...assignment("a5", "s2", "Đề ôn tập chương 2", "Làm câu 1–4", "submitted", 1),
+      submissions: [{ id: "sub-a5", student_id: "s2", assignment_id: "a5", status: "submitted", submitted_at: at(-60 * 5), teacher_comment: null, score: null, returned_at: null,
+        files: [{ id: "f-a5", submission_id: "sub-a5", storage_path: "sample:bai-lam", kind: "original" as const, mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },
     { ...assignment("a3", "s2", "Vẽ 3 đồ thị", "Hàm số bậc nhất trong phiếu", "returned", 6),
       submissions: [{ id: "sub-a3", student_id: "s2", assignment_id: "a3", status: "returned", submitted_at: at(-60 * 24 * 5), teacher_comment: "Đồ thị đúng, nhớ ghi tên trục.", score: 8.5, returned_at: at(-60 * 24 * 4),
         files: [{ id: "f-a3", submission_id: "sub-a3", storage_path: "sample:bai-lam", kind: "original" as const, mime_type: "image/svg+xml", size_bytes: null }], transcripts: [] }] },

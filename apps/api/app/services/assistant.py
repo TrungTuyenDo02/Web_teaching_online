@@ -60,6 +60,33 @@ GUIDES = [
         ),
     ),
     (
+        "assignments",
+        "all",
+        "Bài tập và nộp bài / Assignments and submissions",
+        "/",
+        (
+            "Giáo viên giao bài ở trang Bài tập; mục Chờ chấm chỉ hiện bài đã nộp. "
+            "Xem ảnh, chữa trên ảnh, chạm nhận xét có sẵn, chọn nhanh điểm rồi Trả "
+            "bài hoặc Yêu cầu làm lại; bài chờ chấm tiếp theo tự mở. Học sinh nộp ở "
+            "mục Bài tập trên Trang chính: Chụp ảnh hoặc Chọn ảnh, tối đa 6 ảnh, "
+            "xem điểm và ảnh chữa khi được trả, Nộp lại khi được yêu cầu làm lại. "
+            "Teachers assign, review photos, annotate, comment, grade and return or "
+            "request a redo. Students submit up to 6 photos from the dashboard."
+        ),
+    ),
+    (
+        "audio",
+        "all",
+        "Tiếng vọng, trễ, rè / Echo, delay, choppy audio",
+        "/",
+        (
+            "Nghe vọng hoặc hú: đeo tai nghe, không để hai máy cùng phòng mở loa. "
+            "Tiếng chậm, rè, ngắt quãng: ngồi gần Wi-Fi hoặc cắm dây mạng, dừng tải "
+            "khác; ô video báo mạng yếu; camera tự giảm hình để giữ tiếng. Echo or "
+            "howling: use headphones. Delay or choppy audio: improve the network."
+        ),
+    ),
+    (
         "history",
         "all",
         "Xem lại bài và bài về nhà / Past lessons and homework",

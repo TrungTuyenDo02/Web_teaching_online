@@ -34,8 +34,9 @@ test("AI-02 học sinh không có quản lý tài liệu, AI tắt thì không g
   await signIn(page, STUDENT); await page.goto("/");
   await page.getByRole("button", { name: "Mở trợ giúp", exact: true }).click();
   const chat = page.getByRole("dialog", { name: "Bạn đồng hành" });
-  await chat.getByRole("button", { name: "Hỏi AI", exact: true }).click();
-  await expect(chat.getByText("Trợ lý AI chưa được bật hoặc cấu hình.", { exact: true })).toBeVisible();
+  await expect(chat.getByLabel("Nhập câu hỏi cho trợ giúp")).toBeFocused();
+  await expect.poll(() => fake.calls.some((call) => call.includes("GET /api/assistant/status"))).toBe(true);
+  await expect(chat.getByRole("button", { name: "Hỏi AI", exact: true })).toHaveCount(0); // AI tắt thì không bày chế độ AI
   await expect(chat.getByRole("link", { name: "Quản lý bài giảng RAG" })).toHaveCount(0);
   expect(fake.calls.some((call) => call.includes("POST /api/assistant/chat"))).toBe(false);
 });

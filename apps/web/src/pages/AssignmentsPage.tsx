@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { backend, errorMessage, type AssignmentItem, type SubmissionItem } from "../lib/data";
 import type { SubmissionFile } from "../lib/api";
@@ -12,6 +12,7 @@ import { ConfirmDialog, Dialog } from "../ui/Dialog";
 import { Field } from "../ui/Field";
 import { Alert, Empty, ErrorState, Loading, useToast } from "../ui/Feedback";
 import { PageHeader } from "../ui/PageHeader";
+import { Segmented } from "../ui/Segmented";
 import { Window } from "../ui/Window";
 
 // Excalidraw nặng: chỉ tải khi giáo viên bấm Chữa trên ảnh
@@ -136,12 +137,37 @@ function AssignDialog({ open, onClose, onSaved }: { open: boolean; onClose: () =
   );
 }
 
-function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onClose: () => void; onChanged: () => void }) {
+/** Câu mẫu luôn có trong nhận xét có sẵn, sau các nhận xét thầy cô đã dùng. */
+const STARTER_COMMENTS = [
+  "Bài làm đúng, trình bày rõ ràng. Rất tốt!",
+  "Xem lại các chỗ thầy cô khoanh đỏ trên ảnh.",
+  "Cần ghi đủ các bước giải, không chỉ đáp số.",
+  "Kiểm tra lại phép tính trước khi nộp.",
+];
+const QUICK_SCORES = ["10", "9", "8", "7", "6", "5"].map((value) => ({ value, label: value }));
+
+/** Nhận xét, điểm đang viết dở của từng bài nộp: giữ khi đóng hộp thoại, mất khi tải lại trang. */
+type Draft = { comment: string; score: string };
+
+function ReviewDialog({ item, drafts, bank, remaining, onClose, onChanged, onReturned }: {
+  item: AssignmentItem;
+  drafts: Map<string, Draft>;
+  /** Nhận xét có sẵn để chạm chèn (đã dùng trước + câu mẫu) */
+  bank: string[];
+  /** Số bài chờ chấm khác: trả bài xong tự mở bài tiếp theo */
+  remaining: number;
+  onClose: () => void;
+  onChanged: () => void;
+  onReturned: () => void;
+}) {
   const toast = useToast();
   const submission = item.submissions[0];
+  const draft = submission ? drafts.get(submission.id) : undefined;
   const [transcript, setTranscript] = useState(submission?.transcripts[0]?.content ?? null);
-  const [comment, setComment] = useState(submission?.teacher_comment ?? "");
-  const [score, setScore] = useState(submission?.score == null ? "" : String(submission.score));
+  const [comment, setCommentState] = useState(draft?.comment ?? submission?.teacher_comment ?? "");
+  const [score, setScoreState] = useState(draft?.score ?? (submission?.score == null ? "" : String(submission.score)));
+  const setComment = (value: string) => { setCommentState(value); if (submission) drafts.set(submission.id, { comment: value, score }); };
+  const setScore = (value: string) => { setScoreState(value); if (submission) drafts.set(submission.id, { comment, score: value }); };
   const [busy, setBusy] = useState<"ocr" | "return" | "redo" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [annotating, setAnnotating] = useState<string | null>(null);
@@ -195,9 +221,9 @@ function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onCl
     setBusy(redo ? "redo" : "return"); setError(null);
     try {
       await backend.returnSubmission(submission.id, { teacher_comment: comment, score: score === "" ? null : Number(score), redo });
+      drafts.delete(submission.id);
       toast.success(redo ? t("Đã gửi yêu cầu làm lại cho {name}.", { name: item.student_name }) : t("Đã trả bài cho {name}.", { name: item.student_name }));
-      onChanged();
-      onClose();
+      onReturned();
     } catch (err) {
       setError(errorMessage(err, "Không trả được bài."));
     } finally {
@@ -212,6 +238,9 @@ function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onCl
       ) : (
         <div className="stack">
           <p className="muted">{t("{name} nộp lúc {when}", { name: item.student_name, when: formatDateTime(submission.submitted_at, new Date()) })}</p>
+          {item.status === "submitted" && remaining > 0 && (
+            <p className="muted">{t("Còn {n} bài khác chờ chấm; trả bài xong sẽ tự mở bài tiếp theo.", { n: remaining })}</p>
+          )}
           <SubmissionImages submission={submission} actions={annotateButton(t("Chữa trên ảnh"))} />
           {annotated.length > 0 && (
             <section className="stack" aria-labelledby="annotated-title">
@@ -248,9 +277,18 @@ function ReviewDialog({ item, onClose, onChanged }: { item: AssignmentItem; onCl
             <Field label={t("Nhận xét cho học sinh")}>
               {(c) => <textarea {...c} rows={3} value={comment} onChange={(e) => setComment(e.target.value)} maxLength={4000} />}
             </Field>
+            <div className="comment-bank" role="group" aria-label={t("Chèn nhận xét có sẵn")}>
+              {bank.map((text) => (
+                <Button key={text} size="sm" title={text} disabled={busy !== null}
+                  onClick={() => setComment(comment.trim() ? `${comment.trimEnd()}\n${text}` : text)}>
+                  {text}
+                </Button>
+              ))}
+            </div>
             <Field label={t("Điểm (0–10)")} hint={t("Để trống nếu chỉ nhận xét.")}>
               {(c) => <input {...c} type="number" min={0} max={10} step={0.25} inputMode="decimal" value={score} onChange={(e) => setScore(e.target.value)} />}
             </Field>
+            <Segmented label={t("Chọn nhanh điểm")} value={score} onChange={setScore} options={QUICK_SCORES} disabled={busy !== null} />
             {error && <Alert tone="error">{error}</Alert>}
             <div className="btn-row btn-row--end">
               <Button onClick={onClose} disabled={busy !== null}>{t("Đóng")}</Button>
@@ -295,6 +333,14 @@ function TeacherAssignments() {
   const [assigning, setAssigning] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const reviewing = list.data?.find((a) => a.id === reviewingId) ?? null; // lấy bản mới sau khi tải lại
+  const drafts = useRef(new Map<string, Draft>()).current;
+  const pending = list.data?.filter((a) => a.status === "submitted") ?? [];
+  // Mặc định mở mục Chờ chấm khi có bài đang chờ, như mục "Đã nộp" của các lớp học trực tuyến
+  const [filter, setFilter] = useState<"pending" | "all" | null>(null);
+  const view = filter ?? (pending.length ? "pending" : "all");
+  const shown = view === "pending" ? pending : (list.data ?? []);
+  const used = (list.data ?? []).flatMap((a) => a.submissions.map((s) => s.teacher_comment?.trim() ?? "")).filter((c) => c && c.length <= 200);
+  const bank = [...new Set([...used.slice(0, 6), ...STARTER_COMMENTS.map((c) => t(c))])];
 
   return (
     <>
@@ -311,8 +357,14 @@ function TeacherAssignments() {
         ) : !list.data?.length ? (
           <Empty title={t("Chưa giao bài nào.")} />
         ) : (
+          <div className="stack">
+          <Segmented className="assignments-filter" label={t("Lọc bài tập")} value={view} onChange={setFilter} options={[
+            { value: "pending" as const, label: t("Chờ chấm ({n})", { n: pending.length }) },
+            { value: "all" as const, label: t("Tất cả ({n})", { n: list.data.length }) },
+          ]} />
+          {!shown.length ? <Empty title={t("Không còn bài chờ chấm.")} /> : (
           <ul className="items">
-            {list.data.map((item) => (
+            {shown.map((item) => (
               <li key={item.id} className="item">
                 <div className="item__top">
                   <span className="item__title" id={`assignment-${item.id}`}>{item.title}</span>
@@ -333,6 +385,8 @@ function TeacherAssignments() {
               </li>
             ))}
           </ul>
+          )}
+          </div>
         )}
       </Window>
       <AssignDialog
@@ -340,11 +394,27 @@ function TeacherAssignments() {
         onClose={() => setAssigning(false)}
         onSaved={() => {
           setAssigning(false);
+          setFilter("all"); // bài vừa giao chưa có bài nộp, mục Chờ chấm không hiện
           toast.success(t("Đã giao bài."));
           void list.reload();
         }}
       />
-      {reviewing && <ReviewDialog item={reviewing} onClose={() => setReviewingId(null)} onChanged={() => void list.reload()} />}
+      {reviewing && (
+        <ReviewDialog
+          key={reviewing.id}
+          item={reviewing}
+          drafts={drafts}
+          bank={bank}
+          remaining={pending.filter((a) => a.id !== reviewing.id).length}
+          onClose={() => setReviewingId(null)}
+          onChanged={() => void list.reload()}
+          onReturned={() => {
+            // Như "học sinh tiếp theo" của các công cụ chấm: mở ngay bài chờ chấm kế tiếp
+            setReviewingId(pending.find((a) => a.id !== reviewing.id)?.id ?? null);
+            void list.reload();
+          }}
+        />
+      )}
     </>
   );
 }

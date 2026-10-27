@@ -10,7 +10,7 @@ import {
   type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { ConnectionQuality, DisconnectReason, Track, type Participant } from "livekit-client";
+import { AudioPresets, ConnectionQuality, DisconnectReason, Track, VideoPresets, type Participant, type RoomOptions } from "livekit-client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import mascot from "../assets/helper-mascot.png";
 import { t } from "../lib/i18n";
@@ -24,6 +24,25 @@ interface Props {
   /** Phòng bị đóng vì giáo viên kết thúc buổi học (API xóa phòng). */
   onRoomClosed: () => void;
 }
+
+/**
+ * Ưu tiên tiếng nói trên mạng yếu: camera chỉ để thấy mặt (nội dung bài ở bảng viết) nên gửi 360p kèm
+ * lớp 180p; nhận theo cỡ ô hiển thị và ngừng gửi lớp không ai xem; Opus cấu hình cho giọng nói, RED
+ * gửi kèm gói dự phòng để bớt rè khi mất gói, DTX ngừng gửi lúc im lặng. Khử vọng/ồn là mặc định.
+ */
+const ROOM_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h360.resolution },
+  publishDefaults: {
+    videoEncoding: VideoPresets.h360.encoding,
+    videoSimulcastLayers: [VideoPresets.h180],
+    audioPreset: AudioPresets.speech,
+    red: true,
+    dtx: true,
+  },
+  audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+};
 
 /** Một ô video; không có hình (chưa vào phòng, tắt camera) thì hiện linh vật chibi. */
 function Tile({ label, note, status, self, children }: { label: string; note?: string; status?: ReactNode; self?: boolean; children?: ReactNode }) {
@@ -164,6 +183,7 @@ export default function VideoPanel({ url, token, peerLabel, onRoomClosed }: Prop
       serverUrl={url}
       token={token}
       connect
+      options={ROOM_OPTIONS}
       video
       audio
       data-lk-theme="default"
@@ -178,6 +198,7 @@ export default function VideoPanel({ url, token, peerLabel, onRoomClosed }: Prop
         <TrackToggle className="lk-button" source={Track.Source.Microphone}>{t("Micro")}</TrackToggle>
         <TrackToggle className="lk-button" source={Track.Source.Camera}>{t("Camera")}</TrackToggle>
       </div>
+      <p className="video-tip">{t("Nghe vọng hoặc hú: đeo tai nghe, và đừng để hai máy cùng phòng mở loa.")}</p>
     </LiveKitRoom>
   );
 }
