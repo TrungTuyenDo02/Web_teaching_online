@@ -1,6 +1,6 @@
 # Thiết kế: chặn token video cũ vào lại phòng đã đóng
 
-**Trạng thái (2026-10-26): B2 và L4 thu hồi lại theo chu kỳ (mục 9.4) đã code và test cục bộ, CHƯA kiểm trên Cloud (T16), CHƯA duyệt production, P1 CHƯA được bảo đảm.** Chủ dự án cho phép viết test và bản thử cục bộ; chưa cho triển khai production. Chưa đổi cấu hình LiveKit Cloud, chưa gọi LiveKit thật cho bản này, chưa deploy. Lỗi "token video cũ" vẫn **mở** (`acceptance.md` mục 5). Chỉ ghi quyết định production mới trong `decisions.md` và sửa quyết định 18 ("Còn hở") khi thử dev (mục 9.3) đạt và chủ dự án duyệt.
+**Trạng thái (2026-10-27): B2 và L4 thu hồi lại theo chu kỳ (mục 9.4) đã code, test cục bộ và **T16 đạt trên LiveKit Cloud dev**; CHƯA duyệt production, P1 CHƯA được bảo đảm (còn hở khi API ngừng > 6 phút, buổi của học sinh đã xóa hẳn; T4/T10 chưa làm tay).** (Trạng thái 2026-10-26: chưa kiểm Cloud.) Chủ dự án cho phép viết test và bản thử cục bộ; chưa cho triển khai production. Chưa đổi cấu hình LiveKit Cloud, chưa gọi LiveKit thật cho bản này, chưa deploy. Lỗi "token video cũ" vẫn **mở** (`acceptance.md` mục 5). Chỉ ghi quyết định production mới trong `decisions.md` và sửa quyết định 18 ("Còn hở") khi thử dev (mục 9.3) đạt và chủ dự án duyệt.
 
 Đã chốt: `/join` không tạo được phòng video thì trả **502 "Chưa mở được phòng video, thử lại"**.
 
@@ -189,7 +189,7 @@ Theo T8b, một lần thu hồi lúc kết thúc buổi chỉ giữ 6–12 phút
 Còn hở, ghi rõ:
 - API (hoặc LiveKit API) ngừng lâu hơn thời gian Cloud giữ thu hồi thì G2 quay lại cho tới khi vòng lặp chạy lại. Đây là giới hạn của mọi cách dựa vào thu hồi trên Cloud.
 - Học sinh bị xóa hẳn: hàng `sessions` bị xóa nên không còn gì để thu hồi lại; token cũ của buổi gần đây vẫn còn hạn tối đa ~3 giờ sau buổi (TTL 2 giờ + 1 giờ vào muộn). Giảm nhẹ: xóa học sinh sau khi buổi cuối đã qua quá mốc đó.
-- Chưa kiểm trên Cloud rằng thu hồi lặp lại **gia hạn** thời gian giữ (giả định của mô hình). Cần chạy thử T16 trên dự án LiveKit dev: thu hồi mỗi 2 phút trong 20 phút, thử token cũ ở +12/+20 phút (phòng có người giữ như T8b).
+- **T16 đạt trên LiveKit Cloud dev (2026-10-27, `scripts/livekit_dev_check.py T16 --minutes 1 6 12 16 20`):** B giữ phòng suốt lúc đo, A bị thu hồi bằng đúng `tokens.revoke_livekit_tokens` mỗi 2 phút (A không ở trong phòng, như sau khi buổi đóng). Token cũ của A bị từ chối ở +1/+6/+12/+16/+20 phút (`401 invalid token: revoked`, đã thu hồi 1/3/6/8/10 lần). +12 trở đi vượt khoảng 6–12 phút của một lần thu hồi (T8b), nên thu hồi lặp lại **có** gia hạn thời gian giữ, đúng giả định của mô hình. Chưa đo qua toàn bộ thời hạn token (~3 giờ) hay sau khi API khởi động lại; T4/T10 vẫn làm tay.
 - Mỗi chu kỳ gọi `RemoveParticipant` cho 2 identity × số buổi đã đóng trong ~3 giờ gần nhất (một giáo viên: vài buổi), không đáng kể về hạn mức API.
 
 ## 10. Dọn phòng sau xóa học sinh (G4, đã code cục bộ)

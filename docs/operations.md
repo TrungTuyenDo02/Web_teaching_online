@@ -27,6 +27,29 @@ Khi đến lúc chạy thử, trên môi trường đã cấu hình:
 
 Địa chỉ IP của laptop có thể đổi khi đổi Wi-Fi: chạy lại chế độ LAN bằng IP hiện tại và nhập mã ghép nối mới. Phòng học production cần địa chỉ HTTPS/WSS ổn định đã được triển khai; chưa chốt hosting trong lần này.
 
+### 2b. Thử với người ở mạng khác qua Cloudflare quick tunnel (chưa có VPS)
+
+Một địa chỉ HTTPS tạm `https://<tên>.trycloudflare.com` trỏ vào `vite preview` (bản build), `/api` và `/board` (WebSocket) đi qua proxy của preview tới API và máy chủ bảng trên laptop (`vite.config.ts`, chế độ `tunnel`). Có HTTPS nên camera/micro dùng được trên điện thoại; LiveKit và Supabase vẫn là dịch vụ Cloud. Không cần tài khoản Cloudflare. Hạn chế: địa chỉ đổi mỗi lần chạy lại, laptop phải bật suốt buổi, không có cam kết ổn định; chỉ để thử ngắn, không thay hosting.
+
+Cài một lần: `winget install --id Cloudflare.cloudflared`. Cổng 8000 trên máy này đang bị dự án khác dùng nên API chạy cổng 8010. Bốn cửa sổ PowerShell, từ thư mục gốc dự án:
+
+```powershell
+# 1. Tunnel: chép địa chỉ https://....trycloudflare.com in ra
+cloudflared tunnel --no-autoupdate --url http://127.0.0.1:4173
+
+# 2. Máy chủ bảng (thay <URL> bằng địa chỉ ở bước 1, không có / ở cuối)
+cd services/whiteboard-sync; $env:CORS_ORIGINS = "<URL>"; npm run dev
+
+# 3. API: bảng đi qua /board của cùng địa chỉ
+cd apps/api; $env:CORS_ORIGINS = "<URL>"; $env:WHITEBOARD_PUBLIC_URL = "<URL>/board" -replace '^https', 'wss'
+.venv\Scripts\uvicorn app.main:app --port 8010
+
+# 4. Web: build chế độ tunnel rồi phục vụ ở 127.0.0.1:4173
+make tunnel-web
+```
+
+Kiểm nhanh: mở `<URL>` trên điện thoại bằng 4G (không cùng Wi-Fi), đăng nhập, vào phòng; bảng phải báo đã kết nối. Biến đặt bằng `$env:` chỉ sống trong cửa sổ đó, không sửa file môi trường. Preview chỉ nhận host `*.trycloudflare.com`/localhost; máy chủ bảng chặn Origin khác `<URL>`. Tắt tunnel (Ctrl+C ở cửa sổ 1) là địa chỉ hết dùng được; nhớ kết thúc buổi trước khi tắt API/bảng.
+
 ## 3. Xử lý lỗi thường gặp
 
 | Dấu hiệu | Làm trước | Điều kiện dừng/chưa được coi là xong |

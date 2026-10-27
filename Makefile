@@ -84,4 +84,9 @@ test-e2e: ## Test trình duyệt đầy đủ, gồm nhóm @slow
 build-web: ## Build web
 	cd apps/web && npm run build
 
-.PHONY: help install install-api install-web install-board dev-api dev-web dev-board dev-board-local dev-board-lan dev-web-lan require-lan-ip tablet-usb test test-api test-board test-evals test-e2e test-e2e-smoke lint build-web
+# Thử với người dùng thật qua Cloudflare quick tunnel (docs/operations.md): API cổng API_PORT, bảng 8787, rồi
+# cloudflared tunnel --url http://127.0.0.1:4173. Chế độ tunnel ép web gọi /api cùng địa chỉ với trang.
+tunnel-web: ## Build web rồi phục vụ ở 127.0.0.1:4173, proxy /api và /board (WebSocket) [API_PORT=8010]
+	cd apps/web && npm run build -- --mode tunnel && API_PORT=$(or $(API_PORT),8010) npm run preview -- --mode tunnel
+
+.PHONY: help install install-api install-web install-board dev-api dev-web dev-board dev-board-local dev-board-lan dev-web-lan require-lan-ip tablet-usb test test-api test-board test-evals test-e2e test-e2e-smoke lint build-web tunnel-web

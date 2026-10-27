@@ -47,6 +47,23 @@ export default defineConfig(({ mode }) => {
     // e2e: không tải nóng. Sửa mã trong lúc test chạy (phiên khác, trình soạn thảo) làm trang đang test tự
     // tải lại giữa chừng (trang trắng, lỗi context React); lần mở trang sau vẫn nhận mã mới
     server: { port: 5173, host: e2e ? "127.0.0.1" : lanIp, hmr: e2e ? false : undefined },
+    // `--mode tunnel` (make tunnel-web, docs/operations.md): bản build qua một địa chỉ HTTPS của Cloudflare quick
+    // tunnel; /api và /board (WebSocket) đi chung địa chỉ đó nên không mở thêm cổng hay CORS cho trang lạ.
+    // shortcut: chỉ để thử với người dùng thật trong thời gian ngắn, triển khai lâu dài dùng HTTPS cố định (VPS).
+    // Ép API cùng địa chỉ trang, kể cả khi file môi trường của web có VITE_API_URL trỏ localhost
+    define: mode === "tunnel" ? { "import.meta.env.VITE_API_URL": JSON.stringify("") } : undefined,
+    preview: mode === "tunnel"
+      ? {
+          host: "127.0.0.1",
+          port: 4173,
+          strictPort: true,
+          allowedHosts: [".trycloudflare.com"],
+          proxy: {
+            "/api": `http://127.0.0.1:${process.env.API_PORT ?? "8010"}`,
+            "/board": { target: "ws://127.0.0.1:8787", ws: true, rewrite: (p: string) => p.replace(/^\/board/, "") },
+          },
+        }
+      : undefined,
     envDir: lanIp || e2e ? false : undefined,
     cacheDir: e2e ? process.env.E2E_VITE_CACHE : undefined, // thư mục tạm riêng của lần chạy test (global-setup.ts)
   };

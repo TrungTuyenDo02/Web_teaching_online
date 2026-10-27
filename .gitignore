@@ -32,8 +32,12 @@ supabase/.temp/
 /data/
 *.local
 
-# Claude Code: cài đặt riêng từng máy
-.claude/settings.local.json
+# Công cụ AI (Claude Code, Codex, graphify): cấu hình, hook, skill chỉ giữ trên máy
+.claude/
+.agents/
+.codex/
+graphify-out/
+.graphifyignore
 
 # Hướng dẫn AI và prompt thực hành chỉ giữ trên máy
 AGENTS.md

@@ -1,4 +1,4 @@
-"""Thử T1–T14 (docs/design-video-token.md mục 9.3) trên dự án LiveKit DEV, không production.
+"""Thử T1–T16 (docs/design-video-token.md mục 9.3) trên dự án LiveKit DEV, không production.
 
 Chưa chạy lần nào. Chỉ chạy khi chủ dự án cho phép và đã có dự án LiveKit dev riêng.
 
@@ -16,6 +16,7 @@ Chạy từ `apps/api`:
     python -m scripts.livekit_dev_check --dev-url ... T8 --minutes 1 6 12 30 60
     python -m scripts.livekit_dev_check --dev-url ... T8B --minutes 1 6 12 20 30 45 60
     python -m scripts.livekit_dev_check --dev-url ... T15 --minutes 60
+    python -m scripts.livekit_dev_check --dev-url ... T16 --minutes 1 6 12 16 20
 
 Mỗi bước dùng phòng tạm `devcheck-<hex>` và danh tính giả `devcheck-a`/`devcheck-b`, không dùng
 dữ liệu học sinh, xóa phòng khi xong. In kết quả để chép vào bảng trong docs/acceptance.md.
@@ -226,6 +227,39 @@ async def t8b(s, room, args):
     return "; ".join(lines) + " (mốc VÀO ĐƯỢC đầu tiên = thu hồi hết hiệu lực)"
 
 
+async def t16(s, room, args):
+    """L4 (mục 9.4) trên Cloud: B giữ phòng như T8b; thu hồi A bằng đúng hàm của vòng lặp nền,
+    lặp lại mỗi 2 phút, rồi thử token cũ ở từng mốc. Đạt khi mọi mốc bị từ chối, kể cả sau 12
+    phút (T8b: một lần thu hồi hết hiệu lực trong khoảng 6–12 phút)."""
+    await tokens.ensure_livekit_room(s, room, timedelta(minutes=max(args.minutes) + 10))
+    old = _old_token(s, room, A)
+    keeper = await _connect(s, _token(s, room, B))
+    if isinstance(keeper, str):
+        return f"B giữ phòng: {keeper} (cần vào được mới đo được)"
+    revokes = 0
+
+    async def revoke_forever():
+        nonlocal revokes
+        while True:
+            await tokens.revoke_livekit_tokens(s, room, [A])
+            revokes += 1
+            await asyncio.sleep(120)
+
+    loop = asyncio.create_task(revoke_forever())
+    start, lines = time.monotonic(), []
+    try:
+        for minute in sorted(args.minutes):
+            await asyncio.sleep(max(0, start + minute * 60 - time.monotonic()))
+            result = await _try(s, old)
+            lines.append(
+                f"+{minute} phút: {result} (đã thu hồi {revokes} lần, B: {keeper.connection_state})"
+            )
+    finally:
+        loop.cancel()
+        await keeper.disconnect()
+    return "; ".join(lines) + " (mong đợi: mọi mốc bị từ chối)"
+
+
 async def t15(s, room, args):
     """Phòng `ensure` giữ max(minutes) phút: phòng không ai vào và phòng có người vào 30 s rồi
     rời. Ghi lúc mỗi phòng tự đóng, theo dõi thêm 10 phút sau hạn đặt."""
@@ -325,7 +359,7 @@ async def t14(s, room, _):
 
 
 STEPS = {"T1": t1, "T2": t2, "T3": t3, "T3B": t3b, "T5": t5, "T6": t6, "T7": t7, "T8": t8, "T9": t9}
-STEPS |= {"T8B": t8b, "T11": t11, "T12": t12, "T13": t13, "T14": t14, "T15": t15}
+STEPS |= {"T8B": t8b, "T11": t11, "T12": t12, "T13": t13, "T14": t14, "T15": t15, "T16": t16}
 
 
 async def main() -> None:
