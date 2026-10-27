@@ -34,13 +34,13 @@ test("BOARD-IMG xem lại snapshot có ảnh qua Storage", async ({ page, fake }
   await openBoard(page, "teacher", uniqueRoom(info));
   await page.locator('input[type="file"]').setInputFiles({ name: "problem.png", mimeType: "image/png", buffer: png });
   await expect.poll(async () => (await scene(page)).filter(e => e.type === "image").length).toBe(1);
-  const document = await page.evaluate(() => {
+  const snapshot = await page.evaluate(() => {
     const api = (window as any).__devBoardApi;
     return { version: 2, elements: api.getSceneElementsIncludingDeleted(), files: api.getFiles() };
   });
   await signIn(page, TEACHER);
   fake.on("GET", /^\/rest\/v1\/sessions$/, () => ({ status: 200, body: { board_snapshot_path: "stu-a/test.json" } }));
-  fake.on("GET", /^\/storage\/v1\/object\/(?:authenticated\/)?boards\/stu-a\/test.json$/, () => ({ status: 200, body: document }));
+  fake.on("GET", /^\/storage\/v1\/object\/(?:authenticated\/)?boards\/stu-a\/test.json$/, () => ({ status: 200, body: snapshot }));
   await page.goto("/history/saved-image/board");
   await expect(page.getByRole("heading", { name: "Bảng cuối buổi (chỉ xem)" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => {

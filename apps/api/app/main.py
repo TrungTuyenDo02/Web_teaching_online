@@ -17,7 +17,7 @@ from app.routers import (
     teaching_notes,
     weekly_slots,
 )
-from app.services import no_show
+from app.services import finalize, no_show
 
 logger = logging.getLogger("app")
 
@@ -33,11 +33,13 @@ async def lifespan(_: FastAPI):
         logger.warning(
             "Chưa cấu hình: %s (chỉ chấp nhận ở môi trường development)", ", ".join(missing)
         )
-    task = None
+    tasks = []
     if settings.no_show_interval_seconds > 0 and settings.supabase_service_role_key:
-        task = asyncio.create_task(no_show.run_forever(settings))
+        tasks.append(asyncio.create_task(no_show.run_forever(settings)))
+        if settings.livekit_url:
+            tasks.append(asyncio.create_task(finalize.revoke_forever(settings)))
     yield
-    if task:
+    for task in tasks:
         task.cancel()
 
 

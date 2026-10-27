@@ -4,18 +4,20 @@ Mỗi bước gọi lại được (idempotent), nên lỗi giữa chừng hay A
 chuỗi. `sessions.finalized_at` rỗng nghĩa là còn việc chưa xong (vòng lặp nền thử lại).
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
 from app.config import Settings
 from app.core import time as clock
 from app.models import CLOSED_STATUSES, SessionRow, UploadIntent
-from app.repo import Repository
+from app.repo import Repository, SupabaseRepository
 from app.services.board_document import BoardSnapshot, validate_snapshot
 from app.services.tokens import (
     close_livekit_room,
     close_whiteboard_room,
     list_livekit_rooms,
+    revoke_livekit_tokens,
 )
 
 logger = logging.getLogger("app.finalize")
@@ -26,6 +28,10 @@ RETRY_AFTER = timedelta(minutes=1)
 # KHÔNG chứng minh uploader thôi ghi (tiến trình có thể treo rồi chạy tiếp, timeout HTTP phía máy
 # này không dừng được yêu cầu đã gửi): hàng chỉ do chính uploader xóa khi đã có kết quả chắc chắn.
 UPLOAD_LEASE = timedelta(minutes=10)
+# Cloud giữ thu hồi 6–12 phút (T8b): thu hồi lại thưa hơn mức đó thì token cũ có lúc vào lại được
+REVOKE_EVERY = timedelta(minutes=2)
+# Token LiveKit tự cấp lại cho client đang nối sống tới 10 phút (Tokens & grants)
+REFRESH_MARGIN = timedelta(minutes=10)
 
 
 async def video_identities(repo: Repository, session: SessionRow) -> list[str]:
@@ -152,6 +158,40 @@ async def sweep_livekit_rooms(repo: Repository, settings: Settings) -> int:
     if unknown:
         logger.info("Bỏ qua %d phòng video không thuộc buổi học nào", unknown)
     return done
+
+
+async def revoke_closed_sessions(repo: Repository, settings: Settings, now: datetime) -> int:
+    """Thu hồi lại token video của buổi đã đóng mà token còn có thể hạn (G2, T8b): Cloud chỉ giữ
+    thu hồi 6–12 phút, còn phòng đã xóa thì token chưa thu hồi vào lại được (T3B). Không cần phòng
+    còn tồn tại (T7). Trả số buổi đã thu hồi; lỗi một buổi thì để lần sau.
+
+    Token chỉ được cấp trong khung giờ vào phòng và sống max(TTL, đến hết khung giờ), nên mọi token
+    của buổi hết hạn trước scheduled_end + vào muộn + TTL (+ token LiveKit tự cấp lại)."""
+    lifetime = (
+        timedelta(minutes=settings.join_late_minutes, seconds=settings.livekit_token_ttl_seconds)
+        + REFRESH_MARGIN
+    )
+    done = 0
+    for session in await repo.list_closed_sessions(now - lifetime):
+        try:
+            identities = await video_identities(repo, session)
+            await revoke_livekit_tokens(settings, session.room_name, identities)
+            done += 1
+        except Exception:
+            logger.exception("Chưa thu hồi lại được token video của buổi học %s", session.id)
+    return done
+
+
+async def revoke_forever(settings: Settings) -> None:
+    """Vòng lặp nền riêng, chu kỳ REVOKE_EVERY ngắn hơn thời gian Cloud giữ thu hồi (≥ 6 phút);
+    không chờ các việc chậm của vòng lặp no_show."""
+    repo = SupabaseRepository(settings)
+    while True:
+        try:
+            await revoke_closed_sessions(repo, settings, clock.now_utc())
+        except Exception:
+            logger.exception("Không thu hồi lại được token video, sẽ thử lại")
+        await asyncio.sleep(REVOKE_EVERY.total_seconds())
 
 
 async def retry_pending(repo: Repository, settings: Settings, now: datetime) -> int:

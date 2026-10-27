@@ -207,15 +207,17 @@ def _not_found(exc: Exception) -> bool:
     return isinstance(exc, lk.TwirpError) and exc.code == lk.TwirpErrorCode.NOT_FOUND
 
 
-async def close_livekit_room(
-    settings: Settings, room_name: str, identities: Sequence[str] = ()
+async def revoke_livekit_tokens(
+    settings: Settings, room_name: str, identities: Sequence[str]
 ) -> None:
-    """Thu hồi token video của identities (LiveKit Cloud) rồi xóa phòng: LiveKit ngắt mọi người
-    (ROOM_DELETED). Thu hồi lỗi vẫn xóa phòng, rồi báo lỗi để người gọi thử lại sau.
+    """Thu hồi token video của identities trong phòng (LiveKit Cloud). Có hiệu lực cả khi phòng
+    không còn (T7), nhưng Cloud chỉ giữ khoảng 6–12 phút (T8b): gọi lại được, lỗi thì báo.
 
     Mốc thu hồi = giờ hiện tại (Cloud chỉ nhận trong ±60 s): mọi token cấp trước đó, kể cả token
     ký muộn có nbf lùi về lúc đọc trạng thái (make_livekit_token), bị từ chối khi nối lại.
     """
+    if not identities:
+        return
     revoke_at = int(clock.now_utc().timestamp())
     failure: Exception | None = None
     async with _livekit(settings) as client:
@@ -229,6 +231,21 @@ async def close_livekit_room(
                 # not_found: phòng không còn (đã xóa hoặc tự đóng), không còn gì để thu hồi ở đây
                 if not _not_found(exc):
                     failure = failure or exc
+    if failure:
+        raise failure
+
+
+async def close_livekit_room(
+    settings: Settings, room_name: str, identities: Sequence[str] = ()
+) -> None:
+    """Thu hồi token video của identities rồi xóa phòng: LiveKit ngắt mọi người (ROOM_DELETED).
+    Thu hồi lỗi vẫn xóa phòng, rồi báo lỗi để người gọi thử lại sau."""
+    failure: Exception | None = None
+    try:
+        await revoke_livekit_tokens(settings, room_name, identities)
+    except Exception as exc:
+        failure = exc
+    async with _livekit(settings) as client:
         try:
             await client.room.delete_room(lk.DeleteRoomRequest(room=room_name))
         except Exception as exc:

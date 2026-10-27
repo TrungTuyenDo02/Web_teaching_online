@@ -11,6 +11,7 @@ from app.assistant_models import AssistantMaterial, MaterialInput
 from app.config import Settings, get_settings
 from app.core import time as clock
 from app.models import (
+    CLOSED_STATUSES,
     AssignmentRow,
     DeviceMode,
     Profile,
@@ -121,6 +122,10 @@ class Repository(Protocol):
     async def list_unfinalized_sessions(self, ended_before: datetime) -> list[SessionRow]:
         """Buổi completed chưa có finalized_at, kết thúc trước mốc (việc đóng phòng còn chờ).
         Bỏ qua buổi của học sinh đang xóa (không tạo lại bảng đã dọn)."""
+        ...
+
+    async def list_closed_sessions(self, scheduled_end_after: datetime) -> list[SessionRow]:
+        """Buổi completed/cancelled/no_show có scheduled_end từ mốc trở đi (token video còn hạn)."""
         ...
 
     async def mark_student_deleting(self, student_id: str) -> StudentRow | None:
@@ -675,6 +680,19 @@ class SupabaseRepository:
             resp = await client.get(f"{self._base}/sessions", params=params, headers=self._headers)
             resp.raise_for_status()
         return [SessionRow.model_validate(r) for r in resp.json()]
+
+    async def list_closed_sessions(self, scheduled_end_after: datetime) -> list[SessionRow]:
+        statuses = ",".join(sorted(s.value for s in CLOSED_STATUSES))
+        rows = await self._pages(
+            "sessions",
+            {
+                "status": f"in.({statuses})",
+                "scheduled_end": f"gte.{scheduled_end_after.isoformat()}",
+                "select": "*",
+                "order": "scheduled_end.asc,id.asc",
+            },
+        )
+        return [SessionRow.model_validate(row) for row in rows]
 
     async def mark_student_deleting(self, student_id: str) -> StudentRow | None:
         headers = self._headers | {"Prefer": "return=representation"}

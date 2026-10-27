@@ -62,7 +62,7 @@ test("INK-01 đo nét bút: thời gian xử lý, độ trễ sang máy học si
   await teacher.keyboard.press("p");
   const cdp = await teacher.context().newCDPSession(teacher);
   // Lệnh trả về khi trang đã xử lý xong sự kiện, nên thời gian lệnh ≈ thời gian luồng chính xử lý một sự kiện bút
-  const pen = (type: string, i: number) =>
+  const pen = (type: "mousePressed" | "mouseMoved" | "mouseReleased", i: number) =>
     cdp.send("Input.dispatchMouseEvent", {
       type,
       x: box.x + 380 + i * 2.5,

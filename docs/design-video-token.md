@@ -1,6 +1,6 @@
 # Thiết kế: chặn token video cũ vào lại phòng đã đóng
 
-**Trạng thái (2026-10-20): B2 đã code và test cục bộ, CHƯA duyệt production, P1 CHƯA được bảo đảm.** Chủ dự án cho phép viết test và bản thử cục bộ; chưa cho triển khai production. Chưa đổi cấu hình LiveKit Cloud, chưa gọi LiveKit thật cho bản này, chưa deploy. Lỗi "token video cũ" vẫn **mở** (`acceptance.md` mục 5). Chỉ ghi quyết định production mới trong `decisions.md` và sửa quyết định 18 ("Còn hở") khi thử dev (mục 9.3) đạt và chủ dự án duyệt.
+**Trạng thái (2026-10-26): B2 và L4 thu hồi lại theo chu kỳ (mục 9.4) đã code và test cục bộ, CHƯA kiểm trên Cloud (T16), CHƯA duyệt production, P1 CHƯA được bảo đảm.** Chủ dự án cho phép viết test và bản thử cục bộ; chưa cho triển khai production. Chưa đổi cấu hình LiveKit Cloud, chưa gọi LiveKit thật cho bản này, chưa deploy. Lỗi "token video cũ" vẫn **mở** (`acceptance.md` mục 5). Chỉ ghi quyết định production mới trong `decisions.md` và sửa quyết định 18 ("Còn hở") khi thử dev (mục 9.3) đạt và chủ dự án duyệt.
 
 Đã chốt: `/join` không tạo được phòng video thì trả **502 "Chưa mở được phòng video, thử lại"**.
 
@@ -118,7 +118,7 @@ Giả định (không cần khóa trong bộ nhớ, nên đúng với nhiều ti
 Giới hạn còn mở:
 
 - **G1:** thu hồi chỉ có trên Cloud; LiveKit tự cài thì mất L2.
-- **G2:** thu hồi hết hạn (nếu Cloud giữ ngắn) trong khi L3 không chạy được (API chết, LiveKit API lỗi) → token cũ vào phòng mồ côi. Giảm nhẹ nếu T8 cho kết quả ngắn: rút chu kỳ dọn phòng (biến cấu hình riêng).
+- **G2:** thu hồi hết hạn (Cloud giữ 6–12 phút, T8b) → token cũ vào lại phòng đã xóa/mồ côi. **Đã giảm (L4, mục 9.4):** vòng thu hồi lại mỗi 2 phút cho tới khi token hết hạn; còn hở khi API ngừng lâu hơn thời gian giữ, hoặc với buổi của học sinh đã xóa hẳn.
 - **G4 (đã xử lý phần logic cục bộ):** phòng tạo bởi bản mới có nhãn sở hữu được L3 dọn dù học sinh/buổi đã xóa; test có tạo muộn và thu hồi hết hạn. Phòng cũ không có nhãn, metadata bị đổi hoặc khóa/môi trường đã đổi vẫn bỏ qua (mục 10). Phòng còn chờ dọn vẫn chịu G2; không coi đây là bảo đảm P1.
 - **G5:** giữa `W` và lần thu hồi thành công (lỗi, API chết lúc `/end`), người đang trong phòng vẫn ở lại đến lần thử lại; giới hạn sẵn có của quyết định 18.
 - **G6:** token của buổi **đang diễn ra** vẫn dùng được trong khung giờ; không phải lỗi này.
@@ -176,6 +176,21 @@ T5–T7 không đạt thì L2 không dùng được: P1 chỉ còn L1 + L3 và p
 - T15 (2026-10-21): Cloud giữ phòng trống đúng thời gian đặt (60 phút), kể cả sau khi mọi người rời. Phòng buổi học không tự đóng sớm, học sinh rớt mạng nối lại được trong khung giờ. Phòng T8 đóng sớm có lẽ vì T8 xóa rồi `ensure` lại ngay cùng tên (lệnh tạo trùng lúc phòng đang bị xóa); chưa xác minh, không ảnh hưởng luồng thật.
 - P1 **vẫn chưa được bảo đảm**: G2 đã xác nhận (T8b), T4/T10 làm tay chưa chạy. Hướng sửa chờ chủ dự án chốt. Lưu ý: sweeper duyệt phòng từ `ListRooms`; phòng đã xóa không còn trong danh sách, và phòng bị token cũ tạo lại (T3B) có thể không mang metadata, nên nhãn danh tính trong metadata một mình chưa chắc thu hồi lại được. Thu hồi định kỳ cần danh sách (phòng, identity, hạn token) bền ngoài LiveKit; rút thời hạn token cần cơ chế cấp lại token cho client đang học.
 - T8b (2026-10-21): thu hồi chỉ giữ **6–12 phút** (khớp 660 s). Hệ quả: một lần thu hồi lúc kết thúc buổi không đủ; sau khoảng 11 phút token cũ còn hạn vào lại được phòng đã xóa (T3B). Muốn chặn phải thu hồi lại theo chu kỳ ngắn hơn 6 phút cho tới khi token cũ hết hạn, hoặc rút thời hạn token. G2 được xác nhận trên Cloud.
+
+## 9.4 L4: thu hồi lại theo chu kỳ (G2, đã code cục bộ 2026-10-26)
+
+Theo T8b, một lần thu hồi lúc kết thúc buổi chỉ giữ 6–12 phút, trong khi token video sống tới hết khung giờ + TTL. Chủ dự án duyệt hướng "thu hồi định kỳ" (2026-10-26). Bản cài đặt không cần migration:
+
+- Token chỉ được cấp khi `/join` thấy giờ hiện tại trong khung vào phòng, và sống `max(TTL, đến hết khung)`, nên mọi token của một buổi hết hạn trước `scheduled_end + join_late_minutes + livekit_token_ttl_seconds`; cộng thêm 10 phút cho token LiveKit tự cấp lại (`REFRESH_MARGIN`). Danh sách (phòng, identity, hạn) suy ra được từ hàng `sessions` + `video_identities`, không cần bảng mới.
+- `finalize.revoke_closed_sessions`: mọi buổi `completed/cancelled/no_show` có `scheduled_end` trong cửa sổ đó → `tokens.revoke_livekit_tokens` (chỉ thu hồi, không xóa phòng; Cloud ghi nhận cả khi phòng không còn, T7). Lỗi một buổi không chặn buổi khác.
+- `finalize.revoke_forever`: vòng lặp nền **riêng**, mỗi `REVOKE_EVERY` = 2 phút (ngắn hơn mức giữ tối thiểu 6 phút), không chờ các việc chậm của vòng no_show. Bật cùng điều kiện với vòng no_show (`NO_SHOW_INTERVAL_SECONDS > 0`, có service role) và khi có `LIVEKIT_URL`.
+- Test: `test_closed_session_tokens_stay_revoked_until_they_expire` (mô hình 660 s: thu hồi lại mỗi 2 phút giữ token cũ ngoài phòng đã xóa tới khi hết hạn, rồi thôi gọi LiveKit), `test_revoke_closed_sessions_skips_open_sessions_and_keeps_going_after_errors`. Viết trước, đỏ trên code cũ.
+
+Còn hở, ghi rõ:
+- API (hoặc LiveKit API) ngừng lâu hơn thời gian Cloud giữ thu hồi thì G2 quay lại cho tới khi vòng lặp chạy lại. Đây là giới hạn của mọi cách dựa vào thu hồi trên Cloud.
+- Học sinh bị xóa hẳn: hàng `sessions` bị xóa nên không còn gì để thu hồi lại; token cũ của buổi gần đây vẫn còn hạn tối đa ~3 giờ sau buổi (TTL 2 giờ + 1 giờ vào muộn). Giảm nhẹ: xóa học sinh sau khi buổi cuối đã qua quá mốc đó.
+- Chưa kiểm trên Cloud rằng thu hồi lặp lại **gia hạn** thời gian giữ (giả định của mô hình). Cần chạy thử T16 trên dự án LiveKit dev: thu hồi mỗi 2 phút trong 20 phút, thử token cũ ở +12/+20 phút (phòng có người giữ như T8b).
+- Mỗi chu kỳ gọi `RemoveParticipant` cho 2 identity × số buổi đã đóng trong ~3 giờ gần nhất (một giáo viên: vài buổi), không đáng kể về hạn mức API.
 
 ## 10. Dọn phòng sau xóa học sinh (G4, đã code cục bộ)
 

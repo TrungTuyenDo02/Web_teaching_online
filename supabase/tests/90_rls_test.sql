@@ -549,4 +549,36 @@ do $$ begin
 end $$;
 rollback;
 
+-- ===== 0012: ảnh chữa chỉ hiện với học sinh khi bài nộp đã trả =====
+begin;
+insert into public.submission_files (submission_id, storage_path, kind) values
+  ('b0b0b0b0-0000-0000-0000-00000000000b', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/x/bai.jpg', 'original'),
+  ('b0b0b0b0-0000-0000-0000-00000000000b', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/x/chua.jpg', 'annotated');
+insert into storage.objects (bucket_id, name) values ('submissions', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/x/chua.jpg');
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+do $$ begin
+  assert (select count(*) from public.submission_files) = 1, 'HS B chưa thấy ảnh chữa khi chưa trả bài';
+  assert (select kind from public.submission_files) = 'original', 'HS B vẫn thấy ảnh gốc của mình';
+  assert (select count(*) from storage.objects where bucket_id = 'submissions') = 1, 'HS B không tải được ảnh chữa chưa trả';
+end $$;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+do $$ begin
+  assert (select count(*) from public.submission_files) = 2, 'GV thấy cả ảnh gốc và ảnh chữa';
+  assert (select count(*) from storage.objects where bucket_id = 'submissions') = 3, 'GV thấy ảnh chữa trong Storage';
+end $$;
+reset role;
+update public.submissions set status = 'returned' where id = 'b0b0b0b0-0000-0000-0000-00000000000b';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+do $$ begin
+  assert (select count(*) from public.submission_files) = 2, 'HS B thấy ảnh chữa sau khi trả bài';
+  assert (select count(*) from storage.objects where bucket_id = 'submissions') = 2, 'HS B tải được ảnh chữa đã trả';
+end $$;
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+do $$ begin
+  assert (select count(*) from public.submission_files) = 0, 'HS A không thấy ảnh của HS B';
+end $$;
+rollback;
+
 select 'RLS OK' as ket_qua;

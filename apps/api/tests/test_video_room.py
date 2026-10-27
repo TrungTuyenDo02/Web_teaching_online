@@ -341,6 +341,43 @@ def test_known_gap_tokens_rejoin_deleted_room_after_revocation_expires(
     assert all(rooms.lk.can_connect(t) for t in tokens)
 
 
+def test_closed_session_tokens_stay_revoked_until_they_expire(settings, repo, rooms, clock):
+    """G2 (T8b): Cloud chỉ giữ thu hồi 6–12 phút, token video sống tới hết khung giờ + TTL. Vòng
+    thu hồi lại mỗi REVOKE_EVERY giữ token cũ ngoài phòng đã xóa cho tới khi chúng hết hạn."""
+    tokens = orphan_after_end(repo, settings, rooms)
+    assert asyncio.run(sweep(repo, settings)) == 1
+    last_exp = max(jwt.decode(t, options={"verify_signature": False})["exp"] for t in tokens)
+    now = lambda: datetime.fromtimestamp(clock.t, UTC)  # noqa: E731
+    while clock.t < last_exp + 60:
+        clock.advance(finalize.REVOKE_EVERY.total_seconds())
+        assert asyncio.run(finalize.revoke_closed_sessions(repo, settings, now())) == 1
+        assert not any(rooms.lk.can_connect(t) for t in tokens)
+
+    # Quá hạn mọi token có thể cấp (kể cả token LiveKit tự cấp lại) thì thôi gọi LiveKit
+    session = repo.sessions[SESSION_ID]
+    lifetime = timedelta(
+        minutes=settings.join_late_minutes, seconds=settings.livekit_token_ttl_seconds
+    )
+    clock.t = (session.scheduled_end + lifetime + finalize.REFRESH_MARGIN).timestamp() + 1
+    calls = len(rooms.lk.calls)
+    assert asyncio.run(finalize.revoke_closed_sessions(repo, settings, now())) == 0
+    assert len(rooms.lk.calls) == calls
+
+
+def test_revoke_closed_sessions_skips_open_sessions_and_keeps_going_after_errors(
+    client, settings, repo, rooms, clock
+):
+    url = f"/api/sessions/{SESSION_ID}/join"
+    assert client.post(url, json={}, headers=auth_header(settings, TEACHER_ID)).status_code == 200
+    now = datetime.now(UTC)
+    assert asyncio.run(finalize.revoke_closed_sessions(repo, settings, now)) == 0  # buổi live
+
+    asyncio.run(end(repo, settings))
+    rooms.lk.fail_next["revoke"] = 1
+    assert asyncio.run(finalize.revoke_closed_sessions(repo, settings, now)) == 0  # lỗi: lần sau
+    assert asyncio.run(finalize.revoke_closed_sessions(repo, settings, now)) == 1
+
+
 def test_known_gap_revocation_expires_while_orphan_room_survives(settings, repo, rooms, clock):
     """G2: vòng lặp nền không chạy (API chết, LiveKit API lỗi) lâu hơn thời gian giữ thu hồi
     thì token cũ vào được phòng mồ côi. Hai người cùng vào được: P1 không được bảo đảm."""

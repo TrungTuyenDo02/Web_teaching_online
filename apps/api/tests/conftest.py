@@ -20,6 +20,7 @@ from app.assistant_models import AssistantMaterial, MaterialInput  # noqa: E402
 from app.config import Settings, get_settings  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import (  # noqa: E402
+    CLOSED_STATUSES,
     AssignmentRow,
     DeviceMode,
     Profile,
@@ -547,6 +548,14 @@ class FakeRepo:
             and s.ended_at < ended_before
             and self.students[s.student_id].deleting_at is None
         ]
+
+    async def list_closed_sessions(self, scheduled_end_after: datetime) -> list[SessionRow]:
+        rows = [
+            s
+            for s in self.sessions.values()
+            if s.status in CLOSED_STATUSES and s.scheduled_end >= scheduled_end_after
+        ]
+        return sorted(rows, key=lambda s: (s.scheduled_end, s.id))
 
     async def mark_student_deleting(self, student_id: str) -> StudentRow | None:
         student = self.students.get(student_id)
